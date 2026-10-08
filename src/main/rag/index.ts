@@ -45,6 +45,16 @@ function statusFromIndex(index: VectorIndex): IndexStatus {
   };
 }
 
+/** An index is only reusable while it was built with the currently-configured embedding model. */
+export function indexMatchesModel(index: VectorIndex, model: string): boolean {
+  return index.embedModel === model;
+}
+
+async function activeEmbedModel(): Promise<string> {
+  const settings = await getSettings().catch(() => null);
+  return settings?.activeEmbeddingModel ?? "";
+}
+
 async function providerNameFor(providerId: string): Promise<string> {
   return (await resolveProviderConfig(providerId))?.name ?? providerId;
 }
@@ -231,14 +241,23 @@ export async function indexDocument(docPath: string, opts?: { force?: boolean })
 
 export async function getStatus(docPath: string): Promise<IndexStatus> {
   const path = resolve(docPath);
+  const model = await activeEmbedModel();
   const inMemory = statuses.get(path);
-  if (inMemory) return inMemory;
+  if (inMemory && (inMemory.state !== "ready" || inMemory.embedModel === model)) {
+    return inMemory;
+  }
   const index = await vectorStore.findByDocPath(path);
-  if (index) {
+  if (index && indexMatchesModel(index, model)) {
     const status = statusFromIndex(index);
     statuses.set(path, status);
     ensureWatcher(path);
     return status;
+  }
+  // The persisted index was built with a different embedding model, so it is stale: report "none"
+  // and let the next index/query rebuild it rather than retrieving against the wrong vector space.
+  if (index) {
+    statuses.delete(path);
+    stopWatcher(path);
   }
   return { docPath: path, ...NONE_STATUS };
 }
@@ -259,7 +278,13 @@ export async function queryDocument(input: {
   topK?: number;
 }): Promise<{ retrieved: Retrieved[]; promptContext: string }> {
   const path = resolve(input.docPath);
-  const index = await vectorStore.findByDocPath(path);
+  let index = await vectorStore.findByDocPath(path);
+  if (index && !indexMatchesModel(index, await activeEmbedModel())) {
+    // The embedding model changed since this index was built; rebuild before it can be used so we
+    // never score a fresh query against vectors from a different model.
+    await indexDocument(path, { force: true });
+    index = await vectorStore.findByDocPath(path);
+  }
   if (!index || index.chunks.length === 0) return { retrieved: [], promptContext: "" };
 
   const settings = await getSettings();

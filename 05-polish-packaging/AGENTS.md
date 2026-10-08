@@ -152,3 +152,16 @@ Windows installer runs the full feature set.
   - `npm run typecheck`, `npm run lint`, `npm test` (38 passing), `npm run build` all pass.
   - No new runtime dependencies (pure JS preserved; no native modules).
   - Installer output dir: `release/` (gitignored); a scratch `release*/` was also gitignored.
+
+### Update (2026-10-09) — packaging unblocked, hardening
+- The `EPERM` was **not** Defender/Controlled Folder Access (CFA is off). It was LM Studio's
+  `Bionic.exe` service (`--run-as-service`, an Electron app) holding a handle on the intermediate
+  `resources/default_app.asar`. Quit LM Studio before `npm run package`. Installer built,
+  silent-installed to `%LOCALAPPDATA%\Programs\Reading Assistant`, and launched successfully.
+- Dependencies: added `overrides.sprintf-js ^1.1.3` (clears the mammoth→argparse advisory). The
+  SheetJS `xlsx` advisory is accepted and documented in `docs/decisions.md` D13.
+- Tests: added Playwright Electron smoke test (`e2e/smoke.spec.ts`, `npm run test:e2e`) that boots
+  the production bundle under the production CSP; unit+integration tests now 56.
+- Production CSP is injected by `transformIndexHtml` (no `'unsafe-inline'` scripts; `worker-src`
+  added) and the renderer no longer carries a static meta tag. Test seam `RA_USER_DATA_DIR` added to
+  `src/main/index.ts` for isolated e2e profiles.

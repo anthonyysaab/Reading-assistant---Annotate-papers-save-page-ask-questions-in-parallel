@@ -157,3 +157,10 @@ re-indexed incrementally on change, and inspected (status, doc map, usage) in th
   `src/renderer/src/context/{useIndexStatus,useExtractedDoc,citationJump}.ts`.
 - Files edited: `src/main/ipc/index.ts`, `src/main/ipc/stubs.ts`, `src/preload/index.ts`
   (`onIndexProgress` only), `src/renderer/src/panes/ContextTab.tsx`.
+
+### Update (2026-10-09) — embedding-model invalidation
+- A persisted index is now only reusable while it matches the active embedding model. `rag/index.ts`
+  exports `indexMatchesModel`; `getStatus` reports `state:"none"` for a stale index and
+  `queryDocument` force re-indexes before scoring (never mixes vector spaces). `ModelsSection`
+  re-indexes the open document when the embedding provider/model changes. Tests added:
+  `rag/index.test.ts` (helper) and `rag/pipeline.test.ts` (open→index→ask→cite + model switch).

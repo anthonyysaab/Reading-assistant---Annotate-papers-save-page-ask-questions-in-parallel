@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { useAppStore } from "@renderer/state/appStore";
 import {
   getDocument,
+  PDF_ASSET_URLS,
   TextLayer,
   type PDFDocumentLoadingTask,
   type PDFDocumentProxy,
@@ -58,7 +59,7 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
     void (async () => {
       try {
         const bytes = await window.api.file.readBytes(ref.path);
-        task = getDocument({ data: new Uint8Array(bytes) });
+        task = getDocument({ data: new Uint8Array(bytes), ...PDF_ASSET_URLS });
         const doc = await task.promise;
         if (!active) {
           void task.destroy();

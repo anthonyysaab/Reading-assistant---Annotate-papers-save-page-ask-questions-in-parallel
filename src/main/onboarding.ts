@@ -5,7 +5,7 @@ import { detectLocalProviders, listProviders } from "@main/providers";
 const DEFAULT_EMBEDDING_PROVIDER = "ollama";
 const DEFAULT_EMBEDDING_MODEL = "nomic-embed-text";
 
-function pickChatSuggestion(
+export function pickChatSuggestion(
   detected: ProviderInfo[],
   providers: ProviderInfo[]
 ): { providerId?: string; model?: string } {
@@ -21,7 +21,7 @@ function pickChatSuggestion(
   return { providerId: candidate.id, ...(model ? { model: model.id } : {}) };
 }
 
-function embeddingReady(
+export function embeddingReady(
   providers: ProviderInfo[],
   providerId: string,
   model: string

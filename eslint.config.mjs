@@ -4,7 +4,14 @@ import globals from "globals";
 
 export default tseslint.config(
   {
-    ignores: ["out/**", "dist/**", "release/**", "node_modules/**", "**/*.d.ts"]
+    ignores: [
+      "out/**",
+      "dist/**",
+      "release/**",
+      "node_modules/**",
+      "src/renderer/public/**",
+      "**/*.d.ts"
+    ]
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -14,6 +21,8 @@ export default tseslint.config(
       "src/preload/**/*.ts",
       "electron.vite.config.ts",
       "vitest.config.ts",
+      "playwright.config.ts",
+      "e2e/**/*.ts",
       "scripts/**/*.mjs"
     ],
     languageOptions: {

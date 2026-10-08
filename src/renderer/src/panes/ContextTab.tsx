@@ -117,7 +117,7 @@ export function ContextTab() {
             {embeddingModel ? ` · ${embeddingModel}` : ""}
           </p>
           <p className="mt-1 leading-relaxed">
-            Changing the embedding model triggers a full re-index. Configure it in Settings.
+            Changing the embedding model invalidates the current index and re-indexes the open document.
           </p>
         </div>
       </section>

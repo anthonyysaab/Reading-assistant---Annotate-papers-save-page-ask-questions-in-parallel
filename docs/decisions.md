@@ -89,3 +89,15 @@ opencode's session side panel with its `review` and `context` tabs.
 target Windows; avoid macOS/Linux-only assumptions.
 **Why:** Development and use happen here.
 **Consequence:** `electron-builder` produces an NSIS installer (M5).
+
+## D13 — Dependency security: accept `xlsx` advisory, pin `sprintf-js`
+**Decision:** Keep SheetJS `xlsx` at 0.18.5 (no patched release is published to npm) and accept its
+two advisories (prototype pollution, ReDoS). Pin the transitive `sprintf-js` to `^1.1.3` via npm
+`overrides` to clear the `mammoth → argparse → sprintf-js` advisory.
+**Why:** The spreadsheet extractor only parses files the user opens locally; there is no untrusted
+remote or network input, and the renderer is sandboxed. The `xlsx` surface is confined to
+`src/main/ingest/xlsx.ts` (`XLSX.read` + `sheet_to_json`), so swapping it for a maintained
+pure-JS reader later is a one-module change behind the ingest seam.
+**Consequence:** `npm audit --omit=dev` reports a single high (xlsx). Revisit if a maintained,
+patched pure-JS xlsx reader is adopted.
+**Date:** 2026-10-09

@@ -4,7 +4,7 @@ import { parseCatalogModels } from "./catalogParse";
 import { requireBody } from "./http";
 import { ollama } from "./ollama";
 import { openaiCompatible } from "./openaiCompatible";
-import { getModule, getProviderConfig } from "./registry";
+import { getModule, getProviderConfig, resolveConfigsFrom } from "./registry";
 import { parseSse } from "./sse";
 
 function streamResponse(chunks: string[], init?: ResponseInit): Response {
@@ -183,6 +183,80 @@ describe("provider registry", () => {
       "deepseek-chat",
       "deepseek-reasoner"
     ]);
+  });
+});
+
+describe("resolveConfigsFrom", () => {
+  it("applies a user override to a built-in provider", () => {
+    const configs = resolveConfigsFrom(
+      [
+        {
+          id: "ollama",
+          name: "My Ollama",
+          moduleId: "ollama",
+          kind: "local",
+          baseUrl: "http://127.0.0.1:9999",
+          needsSecret: false
+        }
+      ],
+      []
+    );
+    const ollama = configs.find((config) => config.id === "ollama");
+    expect(ollama?.name).toBe("My Ollama");
+    expect(ollama?.baseUrl).toBe("http://127.0.0.1:9999");
+  });
+
+  it("omits hidden built-ins but keeps the rest", () => {
+    const configs = resolveConfigsFrom([], ["anthropic"]);
+    expect(configs.some((config) => config.id === "anthropic")).toBe(false);
+    expect(configs.some((config) => config.id === "openai")).toBe(true);
+  });
+
+  it("adds a custom provider backed by a known module", () => {
+    const configs = resolveConfigsFrom(
+      [
+        {
+          id: "groq-work",
+          name: "Groq (work)",
+          moduleId: "openai-compatible",
+          kind: "remote",
+          baseUrl: "https://api.groq.com/openai/v1",
+          needsSecret: true
+        }
+      ],
+      []
+    );
+    expect(configs.find((config) => config.id === "groq-work")).toMatchObject({
+      name: "Groq (work)",
+      moduleId: "openai-compatible",
+      needsSecret: true
+    });
+  });
+
+  it("ignores a custom provider whose module is unknown", () => {
+    const configs = resolveConfigsFrom(
+      [{ id: "weird", name: "Weird", moduleId: "nope", kind: "remote", baseUrl: "x", needsSecret: false }],
+      []
+    );
+    expect(configs.some((config) => config.id === "weird")).toBe(false);
+  });
+
+  it("treats an id matching a built-in as an override, not a duplicate", () => {
+    const configs = resolveConfigsFrom(
+      [
+        {
+          id: "openai",
+          name: "OpenAI (custom)",
+          moduleId: "openai-compatible",
+          kind: "remote",
+          baseUrl: "https://example.test/v1",
+          needsSecret: true
+        }
+      ],
+      []
+    );
+    expect(configs.filter((config) => config.id === "openai")).toHaveLength(1);
+    expect(configs.find((config) => config.id === "openai")?.baseUrl).toBe("https://example.test/v1");
   });
 });
 

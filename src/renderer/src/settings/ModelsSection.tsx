@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ProviderInfo } from "@shared/types";
+import { requestReindex } from "@renderer/lib/commands";
 import { useSettingsStore } from "@renderer/state/settingsStore";
 import { toast } from "@renderer/state/toastStore";
 import { Button, Row, Section, Select, TextInput } from "./fields";
@@ -91,7 +92,10 @@ export function ModelsSection() {
         <Row label="Embedding provider">
           <Select
             value={settings.activeEmbeddingProviderId}
-            onChange={(event) => void patch({ activeEmbeddingProviderId: event.target.value })}
+            onChange={(event) => {
+              const providerId = event.target.value;
+              void patch({ activeEmbeddingProviderId: providerId }).then(() => requestReindex(false));
+            }}
           >
             <option value="">None</option>
             {providers.map((provider) => (
@@ -104,11 +108,12 @@ export function ModelsSection() {
 
         <Row
           label="Embedding model"
-          hint="Ollama `nomic-embed-text` is the recommended offline default. Changing this re-indexes documents."
+          hint="Ollama `nomic-embed-text` is the recommended offline default. Changing this re-indexes the open document."
         >
           <TextInput
             value={settings.activeEmbeddingModel}
             onChange={(event) => void patch({ activeEmbeddingModel: event.target.value })}
+            onBlur={() => void requestReindex(false)}
             placeholder="nomic-embed-text"
             list="embedding-model-suggestions"
           />

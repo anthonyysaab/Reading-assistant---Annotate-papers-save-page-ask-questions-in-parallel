@@ -137,3 +137,11 @@ correctly.
   `viewer/pdf-worker.d.ts`, `viewer/text-viewer.tsx`, `viewer/image-viewer.tsx`,
   `viewer/meta-view.tsx`.
 - Files edited: `layout/DocPane.tsx`, `layout/DocTabs.tsx`, `state/appStore.ts`.
+
+### Update (2026-10-09) — PDF asset gap closed
+- CMaps/standard fonts/WASM are now self-hosted: `electron.vite.config.ts` copies
+  `pdfjs-dist/{cmaps,standard_fonts,wasm}` into `src/renderer/public/pdfjs/` (gitignored; emitted to
+  `out/renderer/pdfjs/`), `viewer/pdf.ts` exports `PDF_ASSET_URLS` (resolved against
+  `document.baseURI`), and `pdf-viewer.tsx` passes `cMapUrl`/`standardFontDataUrl`/`wasmUrl` to
+  `getDocument`. Closes the CJK/JBIG2/JPEG2000 rendering gap. Rotate is still not implemented
+  (normalized-rect overlays remain rotation-safe by design).

@@ -11,3 +11,6 @@ Thumbs.db
 !.env.example
 coverage/
 *.tsbuildinfo
+src/renderer/public/pdfjs/
+test-results/
+playwright-report/

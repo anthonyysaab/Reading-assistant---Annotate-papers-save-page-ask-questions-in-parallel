@@ -39,11 +39,11 @@ export async function cycleTheme(): Promise<void> {
   await useSettingsStore.getState().cycleTheme();
 }
 
-export async function requestReindex(): Promise<void> {
+export async function requestReindex(force = true): Promise<void> {
   const doc = selectActiveDoc(useAppStore.getState());
   if (!doc) return;
   try {
-    await window.api.rag.index(doc.ref.path, { force: true });
+    await window.api.rag.index(doc.ref.path, { force });
   } catch (error) {
     console.warn("Re-index unavailable:", error instanceof Error ? error.message : String(error));
   }
