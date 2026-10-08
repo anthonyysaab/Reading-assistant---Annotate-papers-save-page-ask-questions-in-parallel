@@ -1,0 +1,73 @@
+import { useEffect } from "react";
+import { openSettings, switchPanelTab, togglePalette, togglePanel, toggleSidebar } from "@renderer/lib/commands";
+import { openViaDialog } from "@renderer/lib/openFiles";
+import { useAppStore } from "@renderer/state/appStore";
+import { useChatStore } from "@renderer/state/chatStore";
+
+export function useKeybinds(): void {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.ctrlKey && !event.metaKey) {
+        if (event.key === "Escape") {
+          const activeDocId = useAppStore.getState().activeDocId;
+          if (activeDocId) useChatStore.getState().abort(activeDocId);
+          useAppStore.getState().setSelection(null);
+          window.dispatchEvent(new CustomEvent("ra:escape"));
+        }
+        return;
+      }
+
+      switch (event.key.toLowerCase()) {
+        case "o":
+          event.preventDefault();
+          void openViaDialog();
+          break;
+        case "p":
+          event.preventDefault();
+          togglePalette();
+          break;
+        case "b":
+          event.preventDefault();
+          void toggleSidebar();
+          break;
+        case "j":
+          event.preventDefault();
+          void togglePanel();
+          break;
+        case "1":
+          event.preventDefault();
+          void switchPanelTab("chat");
+          break;
+        case "2":
+          event.preventDefault();
+          void switchPanelTab("annotations");
+          break;
+        case "3":
+          event.preventDefault();
+          void switchPanelTab("context");
+          break;
+        case "enter":
+          event.preventDefault();
+          window.dispatchEvent(new CustomEvent("ra:composer-send"));
+          break;
+        case "f":
+          event.preventDefault();
+          window.dispatchEvent(new CustomEvent("ra:find"));
+          break;
+        case "s":
+          event.preventDefault();
+          window.dispatchEvent(new CustomEvent("ra:save"));
+          break;
+        case ",":
+          event.preventDefault();
+          openSettings();
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+}

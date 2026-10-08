@@ -1,0 +1,173 @@
+import {
+  contextBridge,
+  ipcRenderer,
+  webUtils,
+  type IpcRendererEvent
+} from "electron";
+import { IPC } from "@shared/channels";
+import { fromIpcError, type IpcResult } from "@shared/errors";
+import type {
+  Annotation,
+  Api,
+  ChatRequest,
+  DocApi,
+  ExtractedDoc,
+  FileRef,
+  HealthReport,
+  IndexStatus,
+  ModelInfo,
+  OnboardingChoices,
+  OnboardingStatus,
+  ProviderInfo,
+  ProviderModuleDescriptor,
+  RagApi,
+  Retrieved,
+  Settings,
+  SettingsApi,
+  Thread
+} from "@shared/types";
+
+interface FileChangedEvent {
+  id: string;
+  path: string;
+  type: "change" | "unlink";
+}
+
+async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
+  const result = (await ipcRenderer.invoke(channel, ...args)) as IpcResult<T>;
+  if (result.ok) return result.value;
+  throw fromIpcError(result.error);
+}
+
+type Listener = (event: IpcRendererEvent, ...args: unknown[]) => void;
+
+function subscribe<T>(channel: string, cb: (payload: T) => void, match?: (payload: T) => boolean): () => void {
+  const listener: Listener = (_event, ...args) => {
+    const payload = args[0] as T;
+    if (!match || match(payload)) cb(payload);
+  };
+  ipcRenderer.on(channel, listener);
+  return () => {
+    ipcRenderer.removeListener(channel, listener);
+  };
+}
+
+let watchSequence = 0;
+
+const fileApi: Api["file"] = {
+  openDialog: () => invoke<FileRef | null>(IPC.file.openDialog),
+  ref: (path) => invoke<FileRef>(IPC.file.ref, path),
+  readBytes: (path, range) => invoke<ArrayBuffer>(IPC.file.readBytes, path, range),
+  readText: (path) => invoke<string>(IPC.file.readText, path),
+  writeText: (path, text) => invoke<void>(IPC.file.writeText, path, text),
+  revealInExplorer: (path) => invoke<void>(IPC.file.revealInExplorer, path),
+  openExternal: (path) => invoke<void>(IPC.file.openExternal, path),
+  watch: (path, cb) => {
+    watchSequence += 1;
+    const id = `watch-${watchSequence}`;
+    const off = subscribe<FileChangedEvent>(
+      IPC.file.changed,
+      (event) => cb({ type: event.type }),
+      (event) => event.id === id
+    );
+    void invoke<void>(IPC.file.watch, id, path).catch((error: unknown) => {
+      off();
+      console.error("file.watch failed", error);
+    });
+    return () => {
+      off();
+      void invoke<void>(IPC.file.unwatch, id).catch(() => undefined);
+    };
+  }
+};
+
+const docApi: DocApi = {
+  extract: (path) => invoke<ExtractedDoc>(IPC.doc.extract, path)
+};
+
+const annotationsApi: Api["annotations"] = {
+  list: (docPath) => invoke<Annotation[]>(IPC.annotations.list, docPath),
+  add: (input) => invoke<Annotation>(IPC.annotations.add, input),
+  update: (id, patch) => invoke<Annotation>(IPC.annotations.update, id, patch),
+  remove: (id) => invoke<void>(IPC.annotations.remove, id)
+};
+
+const ragApi: RagApi = {
+  index: (docPath, opts) => invoke<IndexStatus>(IPC.rag.index, docPath, opts),
+  status: (docPath) => invoke<IndexStatus>(IPC.rag.status, docPath),
+  remove: (docPath) => invoke<void>(IPC.rag.remove, docPath),
+  query: (input) =>
+    invoke<{ retrieved: Retrieved[]; promptContext: string }>(IPC.rag.query, input)
+};
+
+const llmApi: Api["llm"] = {
+  chatStream: (req: ChatRequest) => invoke<void>(IPC.llm.chatStream, req),
+  abort: (streamId) => invoke<void>(IPC.llm.abort, streamId),
+  models: (providerId) => invoke<ModelInfo[]>(IPC.llm.models, providerId)
+};
+
+const providersApi: Api["providers"] = {
+  list: () => invoke<ProviderInfo[]>(IPC.providers.list),
+  detectLocal: () => invoke<ProviderInfo[]>(IPC.providers.detectLocal),
+  test: (providerId) => invoke<{ ok: boolean; error?: string }>(IPC.providers.test, providerId),
+  modules: () => invoke<ProviderModuleDescriptor[]>(IPC.providers.modules)
+};
+
+const threadsApi: Api["threads"] = {
+  save: (thread: Thread) => invoke<void>(IPC.threads.save, thread),
+  load: (docId) => invoke<Thread | null>(IPC.threads.load, docId),
+  list: () => invoke<Thread[]>(IPC.threads.list),
+  remove: (docId) => invoke<void>(IPC.threads.remove, docId),
+  exportMarkdown: (thread: Thread) => invoke<string | null>(IPC.threads.export, thread)
+};
+
+const settingsApi: SettingsApi = {
+  get: () => invoke<Settings>(IPC.settings.get),
+  set: (patch) => invoke<Settings>(IPC.settings.set, patch),
+  setSecret: (providerId, secret) => invoke<void>(IPC.settings.setSecret, providerId, secret),
+  clearSecret: (providerId) => invoke<void>(IPC.settings.clearSecret, providerId)
+};
+
+const eventsApi: Api["events"] = {
+  onChatToken: (cb) => subscribe<{ streamId: string; delta: string }>(IPC.llm.token, cb),
+  onChatDone: (cb) => subscribe<{ streamId: string; usage?: unknown }>(IPC.llm.done, cb),
+  onChatError: (cb) => subscribe<{ streamId: string; error: string }>(IPC.llm.error, cb),
+  onIndexProgress: (cb) =>
+    subscribe<{ docPath: string; done: number; total: number; phase: string }>(
+      IPC.rag.progress,
+      cb
+    ),
+  onFileChanged: (cb) =>
+    subscribe<FileChangedEvent>(IPC.file.changed, (event) => cb({ path: event.path, type: event.type }))
+};
+
+const healthApi: Api["health"] = {
+  check: () => invoke<HealthReport>(IPC.health.check)
+};
+
+const onboardingApi: Api["onboarding"] = {
+  status: () => invoke<OnboardingStatus>(IPC.onboarding.status),
+  complete: (choices: OnboardingChoices) => invoke<Settings>(IPC.onboarding.complete, choices)
+};
+
+const api: Api = {
+  file: fileApi,
+  doc: docApi,
+  annotations: annotationsApi,
+  rag: ragApi,
+  llm: llmApi,
+  providers: providersApi,
+  threads: threadsApi,
+  settings: settingsApi,
+  events: eventsApi,
+  health: healthApi,
+  onboarding: onboardingApi
+};
+
+contextBridge.exposeInMainWorld("api", api);
+
+// Modern Electron removed File.path (v32+). Resolving a dropped file's path requires
+// webUtils in the preload; this is the single narrow exception to the "api only" bridge.
+contextBridge.exposeInMainWorld("desktop", {
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file)
+});

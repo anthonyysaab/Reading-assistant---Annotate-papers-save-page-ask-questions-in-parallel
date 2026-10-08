@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root,
+[data-theme="dark"] {
+  --bg: #0e0f11;
+  --bg-subtle: #16181c;
+  --panel: #1b1e23;
+  --border: #2a2e35;
+  --text: #e6e8ec;
+  --text-weak: #9aa1ab;
+  --accent: #4c8dff;
+  --syntax-string: #a5d6a7;
+  --syntax-keyword: #c792ea;
+  --syntax-comment: #6b7280;
+  --anno-yellow: #f2c94c;
+  --anno-green: #6fcf97;
+  --anno-blue: #56ccf2;
+  --anno-pink: #f28fad;
+}
+
+[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-subtle: #f5f6f8;
+  --panel: #fafbfc;
+  --border: #e2e5ea;
+  --text: #1a1d21;
+  --text-weak: #646b76;
+  --accent: #2563eb;
+  --syntax-string: #2f855a;
+  --syntax-keyword: #805ad5;
+  --syntax-comment: #94a3b8;
+  --anno-yellow: #f6c945;
+  --anno-green: #48bb78;
+  --anno-blue: #38bdf8;
+  --anno-pink: #f472b6;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+}
+
+[data-separator] {
+  background: var(--border);
+  transition: background 120ms ease;
+}
+[data-separator]:hover,
+[data-separator][data-active="true"] {
+  background: var(--accent);
+}

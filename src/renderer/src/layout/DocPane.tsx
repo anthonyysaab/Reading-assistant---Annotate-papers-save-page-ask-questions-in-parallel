@@ -1,0 +1,63 @@
+import { useEffect, useState, type ComponentType } from "react";
+import { Icon } from "@renderer/components/Icon";
+import { openViaDialog } from "@renderer/lib/openFiles";
+import { useFileWatch } from "@renderer/hooks/useFileWatch";
+import { selectActiveDoc, useAppStore } from "@renderer/state/appStore";
+import { registerBuiltInRenderers } from "@renderer/viewer/builtins";
+import { resolveFileRenderer, type RendererViewProps } from "@renderer/viewer/registry";
+
+registerBuiltInRenderers();
+
+export function DocPane() {
+  const doc = useAppStore(selectActiveDoc);
+  useFileWatch(doc);
+
+  const renderer = doc ? resolveFileRenderer(doc.ref) : null;
+  const [Viewer, setViewer] = useState<ComponentType<RendererViewProps> | null>(null);
+
+  useEffect(() => {
+    if (!renderer) {
+      setViewer(null);
+      return;
+    }
+    let active = true;
+    setViewer(null);
+    void renderer.load().then((loaded) => {
+      if (active) setViewer(() => loaded);
+    });
+    return () => {
+      active = false;
+    };
+  }, [renderer]);
+
+  if (!doc) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-bg">
+        <Icon name="file" className="h-8 w-8 text-text-weak" />
+        <p className="text-sm text-text">No document open</p>
+        <p className="text-xs text-text-weak">Open a file with Ctrl+O, or drag one onto the window.</p>
+        <button
+          type="button"
+          onClick={() => void openViaDialog()}
+          className="mt-1 rounded border border-border px-3 py-1.5 text-xs text-text hover:bg-panel"
+        >
+          Open file…
+        </button>
+      </div>
+    );
+  }
+
+  if (!renderer) {
+    return (
+      <div className="flex h-full items-center justify-center bg-bg px-8 text-center text-xs text-text-weak">
+        No renderer registered for this file.
+      </div>
+    );
+  }
+
+  if (!Viewer) {
+    return <div className="flex h-full items-center justify-center bg-bg text-xs text-text-weak">Loading viewer…</div>;
+  }
+
+  return <Viewer ref={doc.ref} docId={doc.id} />;
+}

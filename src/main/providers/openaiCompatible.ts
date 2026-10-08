@@ -1,0 +1,89 @@
+import type { ModelInfo } from "@shared/types";
+import { ensureOk, joinUrl, requireBody } from "./http";
+import { asArray, asNumber, asRecord, asString, parseJson } from "./json";
+import { parseSse } from "./sse";
+import type { ProviderModule } from "./types";
+
+function modelsFromPayload(payload: unknown): ModelInfo[] {
+  const data = asArray(asRecord(payload)?.["data"]);
+  const models: ModelInfo[] = [];
+  for (const entry of data) {
+    const record = asRecord(entry);
+    const id = asString(record?.["id"]);
+    if (!id) continue;
+    const contextWindow =
+      asNumber(record?.["context_window"]) ??
+      asNumber(asRecord(record?.["top_provider"])?.["context_length"]);
+    models.push({
+      id,
+      name: id,
+      ...(contextWindow !== undefined ? { contextWindow } : {}),
+      supportsChat: true
+    });
+  }
+  return models;
+}
+
+export const openaiCompatible: ProviderModule = {
+  id: "openai-compatible",
+  name: "OpenAI-compatible",
+  kind: "remote",
+  needsSecret: true,
+  defaultBaseUrl: "https://api.openai.com/v1",
+
+  async *chat({ baseUrl, apiKey, model, messages, temperature, maxTokens, signal }) {
+    const response = await fetch(joinUrl(baseUrl, "/chat/completions"), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {})
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+        ...(temperature !== undefined ? { temperature } : {}),
+        ...(maxTokens !== undefined ? { max_tokens: maxTokens } : {})
+      }),
+      signal
+    });
+    await ensureOk(response);
+
+    for await (const event of parseSse(requireBody(response), signal)) {
+      if (event.data === "[DONE]") return;
+      const chunk = asRecord(parseJson(event.data));
+      const choice = asRecord(asArray(chunk?.["choices"])[0]);
+      const delta = asRecord(choice?.["delta"]);
+      const content = asString(delta?.["content"]);
+      if (content !== undefined && content.length > 0) yield { delta: content };
+    }
+  },
+
+  async embed({ baseUrl, apiKey, model, input, signal }) {
+    const response = await fetch(joinUrl(baseUrl, "/embeddings"), {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {})
+      },
+      body: JSON.stringify({ model, input }),
+      signal
+    });
+    await ensureOk(response);
+    const payload = (await response.json()) as unknown;
+    const data = asArray(asRecord(payload)?.["data"]);
+    return data.map((entry) => {
+      const embedding = asArray(asRecord(entry)?.["embedding"]);
+      return embedding.map((value) => asNumber(value) ?? 0);
+    });
+  },
+
+  async listModels({ baseUrl, apiKey }) {
+    const response = await fetch(joinUrl(baseUrl, "/models"), {
+      headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {},
+      signal: AbortSignal.timeout(8000)
+    });
+    await ensureOk(response);
+    return modelsFromPayload((await response.json()) as unknown);
+  }
+};

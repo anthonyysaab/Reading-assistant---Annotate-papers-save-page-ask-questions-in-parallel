@@ -1,0 +1,69 @@
+.ra-pdf {
+  --ra-pdf-page-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+}
+
+.ra-pdf .ra-pdf-page {
+  position: relative;
+  margin: 0 auto 16px;
+  background: #ffffff;
+  box-shadow: var(--ra-pdf-page-shadow);
+}
+
+.ra-pdf .ra-pdf-page canvas {
+  display: block;
+}
+
+.ra-pdf .ra-pdf-text {
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: transparent;
+  z-index: 1;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.ra-pdf .ra-pdf-text :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.ra-pdf .ra-pdf-text > :not(.markedContent),
+.ra-pdf .ra-pdf-text .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.ra-pdf .ra-pdf-text .markedContent {
+  display: contents;
+}
+
+.ra-pdf .ra-pdf-text span[role="img"] {
+  user-select: none;
+  cursor: default;
+}
+
+.ra-pdf .ra-pdf-text ::selection {
+  background: rgb(76 141 255 / 0.35);
+  color: transparent;
+}
+
+.ra-pdf .ra-pdf-text br::selection {
+  background: transparent;
+}

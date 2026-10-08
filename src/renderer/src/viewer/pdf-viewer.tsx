@@ -1,0 +1,405 @@
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useAppStore } from "@renderer/state/appStore";
+import {
+  getDocument,
+  TextLayer,
+  type PDFDocumentLoadingTask,
+  type PDFDocumentProxy,
+  type RenderTask
+} from "./pdf";
+import "./pdf-viewer.css";
+import type { RendererViewProps } from "./registry";
+import { emitSelection, registerSelectionTarget, type NormalizedRect } from "./selection";
+
+interface Size {
+  w: number;
+  h: number;
+}
+
+type FitMode = "free" | "width" | "page";
+
+const MIN_SCALE = 0.1;
+const MAX_SCALE = 6;
+const PAGE_GAP = 16;
+
+function clampScale(value: number): number {
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
+}
+
+export function PdfViewer({ ref, docId }: RendererViewProps) {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const pagesRef = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
+  const [numPages, setNumPages] = useState(0);
+  const [baseSize, setBaseSize] = useState<Size | null>(null);
+  const [viewportSize, setViewportSize] = useState<Size>({ w: 0, h: 0 });
+  const [scale, setScale] = useState(1);
+  const [fitMode, setFitMode] = useState<FitMode>("width");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [jumpText, setJumpText] = useState("1");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const setSelection = useAppStore((state) => state.setSelection);
+
+  const registerPage = useCallback((pageNumber: number, element: HTMLDivElement | null) => {
+    if (element) pagesRef.current.set(pageNumber, element);
+    else pagesRef.current.delete(pageNumber);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let task: PDFDocumentLoadingTask | null = null;
+    setPdf(null);
+    setBaseSize(null);
+    setError(null);
+    setLoading(true);
+    void (async () => {
+      try {
+        const bytes = await window.api.file.readBytes(ref.path);
+        task = getDocument({ data: new Uint8Array(bytes) });
+        const doc = await task.promise;
+        if (!active) {
+          void task.destroy();
+          return;
+        }
+        const firstPage = await doc.getPage(1);
+        const viewport = firstPage.getViewport({ scale: 1 });
+        if (!active) return;
+        setPdf(doc);
+        setNumPages(doc.numPages);
+        setBaseSize({ w: viewport.width, h: viewport.height });
+        setCurrentPage(1);
+      } catch (loadError) {
+        if (active) setError(loadError instanceof Error ? loadError.message : String(loadError));
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+      pagesRef.current.clear();
+      if (task) void task.destroy();
+    };
+  }, [ref.path]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const observer = new ResizeObserver(() => {
+      setViewportSize({ w: root.clientWidth, h: root.clientHeight });
+    });
+    observer.observe(root);
+    setViewportSize({ w: root.clientWidth, h: root.clientHeight });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!baseSize || viewportSize.w === 0 || fitMode === "free") return;
+    const availW = Math.max(1, viewportSize.w - 2 * PAGE_GAP - 8);
+    const availH = Math.max(1, viewportSize.h - 2 * PAGE_GAP - 8);
+    const next =
+      fitMode === "width" ? availW / baseSize.w : Math.min(availW / baseSize.w, availH / baseSize.h);
+    setScale(clampScale(next));
+  }, [baseSize, viewportSize, fitMode]);
+
+  const goToPage = useCallback(
+    (requested: number) => {
+      const target = Math.min(numPages || 1, Math.max(1, requested));
+      const element = pagesRef.current.get(target);
+      const root = rootRef.current;
+      if (!element || !root) return;
+      root.scrollTo({ top: element.offsetTop - PAGE_GAP, behavior: "smooth" });
+      setCurrentPage(target);
+      setJumpText(String(target));
+    },
+    [numPages]
+  );
+
+  useEffect(
+    () => registerSelectionTarget(docId, { scrollTo: (page) => goToPage(page) }),
+    [docId, goToPage]
+  );
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !pdf) return;
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        const rootTop = root.getBoundingClientRect().top;
+        let best = 1;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        pagesRef.current.forEach((element, pageNumber) => {
+          const distance = Math.abs(element.getBoundingClientRect().top - rootTop);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            best = pageNumber;
+          }
+        });
+        setCurrentPage(best);
+        setJumpText(String(best));
+      });
+    };
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [pdf]);
+
+  const onMouseUp = useCallback(() => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+      emitSelection(null);
+      setSelection(null);
+      return;
+    }
+    const text = selection.toString();
+    if (!text.trim()) {
+      emitSelection(null);
+      setSelection(null);
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    let pageNumber = 0;
+    let pageElement: HTMLDivElement | null = null;
+    for (const [number, element] of pagesRef.current) {
+      if (element.contains(range.startContainer) || element.contains(range.commonAncestorContainer)) {
+        pageNumber = number;
+        pageElement = element;
+        break;
+      }
+    }
+    if (!pageElement) return;
+    const pageRect = pageElement.getBoundingClientRect();
+    const rects: NormalizedRect[] = [];
+    for (const clientRect of Array.from(range.getClientRects())) {
+      const left = Math.max(clientRect.left, pageRect.left);
+      const top = Math.max(clientRect.top, pageRect.top);
+      const right = Math.min(clientRect.right, pageRect.right);
+      const bottom = Math.min(clientRect.bottom, pageRect.bottom);
+      if (right <= left || bottom <= top) continue;
+      rects.push({
+        x: (left - pageRect.left) / pageRect.width,
+        y: (top - pageRect.top) / pageRect.height,
+        w: (right - left) / pageRect.width,
+        h: (bottom - top) / pageRect.height
+      });
+    }
+    if (rects.length === 0) {
+      emitSelection(null);
+      setSelection(null);
+      return;
+    }
+    emitSelection({ docId, docPath: ref.path, kind: "pdf", page: pageNumber, rects, text });
+    setSelection(text);
+  }, [docId, ref.path, setSelection]);
+
+  const zoom = useCallback((factor: number) => {
+    setFitMode("free");
+    setScale((current) => clampScale(current * factor));
+  }, []);
+
+  const pages = pdf
+    ? Array.from({ length: numPages }, (_, index) => (
+        <PdfPage
+          key={index + 1}
+          pdf={pdf}
+          pageNumber={index + 1}
+          scale={scale}
+          baseSize={baseSize ?? { w: 612, h: 792 }}
+          rootRef={rootRef}
+          registerPage={registerPage}
+        />
+      ))
+    : null;
+
+  return (
+    <div className="ra-pdf flex h-full flex-col bg-bg-subtle">
+      <div className="flex flex-wrap items-center gap-1 border-b border-border bg-bg-subtle px-2 py-1 text-xs text-text-weak">
+        <button type="button" onClick={() => zoom(1 / 1.2)} className={toolbarButton} disabled={!pdf}>
+          −
+        </button>
+        <span className="w-12 text-center tabular-nums">{Math.round(scale * 100)}%</span>
+        <button type="button" onClick={() => zoom(1.2)} className={toolbarButton} disabled={!pdf}>
+          +
+        </button>
+        <button type="button" onClick={() => setFitMode("width")} className={toolbarButton} disabled={!pdf}>
+          Fit width
+        </button>
+        <button type="button" onClick={() => setFitMode("page")} className={toolbarButton} disabled={!pdf}>
+          Fit page
+        </button>
+        <span className="mx-1 h-4 w-px bg-border" />
+        <button
+          type="button"
+          onClick={() => goToPage(currentPage - 1)}
+          className={toolbarButton}
+          disabled={!pdf || currentPage <= 1}
+        >
+          Prev
+        </button>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            const parsed = Number.parseInt(jumpText, 10);
+            if (Number.isFinite(parsed)) goToPage(parsed);
+          }}
+          className="flex items-center gap-1"
+        >
+          <input
+            value={jumpText}
+            onChange={(event) => setJumpText(event.target.value)}
+            className="w-12 rounded border border-border bg-panel px-1 py-0.5 text-center text-text outline-none"
+            aria-label="Page number"
+            disabled={!pdf}
+          />
+          <span>/ {numPages || "–"}</span>
+        </form>
+        <button
+          type="button"
+          onClick={() => goToPage(currentPage + 1)}
+          className={toolbarButton}
+          disabled={!pdf || currentPage >= numPages}
+        >
+          Next
+        </button>
+      </div>
+
+      <div ref={rootRef} onMouseUp={onMouseUp} className="relative min-h-0 flex-1 overflow-auto px-4 py-4">
+        {error ? (
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+            <p className="text-sm text-text">Could not open this PDF</p>
+            <p className="max-w-sm break-words text-xs text-text-weak">{error}</p>
+            <button
+              type="button"
+              onClick={() => void window.api.file.openExternal(ref.path)}
+              className="rounded border border-border bg-panel px-3 py-1.5 text-xs text-text hover:bg-bg-subtle"
+            >
+              Open in default app
+            </button>
+          </div>
+        ) : loading || !pdf ? (
+          <div className="flex h-full items-center justify-center text-xs text-text-weak">Loading PDF…</div>
+        ) : (
+          pages
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface PdfPageProps {
+  pdf: PDFDocumentProxy;
+  pageNumber: number;
+  scale: number;
+  baseSize: Size;
+  rootRef: RefObject<HTMLDivElement | null>;
+  registerPage: (pageNumber: number, element: HTMLDivElement | null) => void;
+}
+
+function PdfPage({ pdf, pageNumber, scale, baseSize, rootRef, registerPage }: PdfPageProps) {
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const textRef = useRef<HTMLDivElement | null>(null);
+  const renderedKeyRef = useRef("");
+  const [active, setActive] = useState(false);
+  const [measured, setMeasured] = useState<{ scale: number; w: number; h: number } | null>(null);
+
+  useEffect(() => {
+    const element = pageRef.current;
+    if (!element) return;
+    registerPage(pageNumber, element);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) setActive(entry.isIntersecting);
+      },
+      { root: rootRef.current, rootMargin: "600px 0px" }
+    );
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      registerPage(pageNumber, null);
+    };
+  }, [pageNumber, registerPage, rootRef]);
+
+  useEffect(() => {
+    const element = pageRef.current;
+    if (!element) return;
+    element.style.setProperty("--scale-factor", String(scale));
+    element.style.setProperty("--total-scale-factor", String(scale));
+    element.style.setProperty("--user-unit", "1");
+    element.style.setProperty("--scale-round-x", "1px");
+    element.style.setProperty("--scale-round-y", "1px");
+  }, [scale]);
+
+  useEffect(() => {
+    if (!active) return;
+    const renderKey = `${pageNumber}:${scale}:${window.devicePixelRatio}`;
+    if (renderedKeyRef.current === renderKey) return;
+    let cancelled = false;
+    let renderTask: RenderTask | null = null;
+    let textLayer: TextLayer | null = null;
+    void (async () => {
+      const page = await pdf.getPage(pageNumber);
+      if (cancelled) return;
+      const viewport = page.getViewport({ scale });
+      setMeasured({ scale, w: viewport.width, h: viewport.height });
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const outputScale = window.devicePixelRatio || 1;
+      const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined;
+      canvas.width = Math.floor(viewport.width * outputScale);
+      canvas.height = Math.floor(viewport.height * outputScale);
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
+      renderTask = page.render({ canvas, viewport, transform });
+      await renderTask.promise;
+      if (cancelled) return;
+      const container = textRef.current;
+      if (!container) return;
+      container.replaceChildren();
+      const layer = new TextLayer({
+        textContentSource: page.streamTextContent({ includeMarkedContent: true }),
+        container,
+        viewport
+      });
+      textLayer = layer;
+      await layer.render();
+      renderedKeyRef.current = renderKey;
+    })().catch((renderError: unknown) => {
+      if (cancelled) return;
+      const name =
+        typeof renderError === "object" && renderError !== null && "name" in renderError
+          ? String((renderError as { name?: unknown }).name)
+          : "";
+      if (name === "RenderingCancelledException") return;
+      console.error("PDF page render failed", pageNumber, renderError);
+    });
+    return () => {
+      cancelled = true;
+      renderTask?.cancel();
+      textLayer?.cancel();
+    };
+  }, [active, pdf, pageNumber, scale]);
+
+  const size = measured && measured.scale === scale ? measured : { w: baseSize.w * scale, h: baseSize.h * scale };
+
+  return (
+    <div
+      ref={pageRef}
+      data-page={pageNumber}
+      className="ra-pdf-page"
+      style={{ width: size.w, height: size.h }}
+    >
+      <canvas ref={canvasRef} />
+      <div ref={textRef} className="ra-pdf-text" />
+    </div>
+  );
+}
+
+const toolbarButton = "rounded border border-border px-2 py-0.5 hover:bg-panel hover:text-text disabled:opacity-40";
