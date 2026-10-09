@@ -165,3 +165,7 @@ Windows installer runs the full feature set.
 - Production CSP is injected by `transformIndexHtml` (no `'unsafe-inline'` scripts; `worker-src`
   added) and the renderer no longer carries a static meta tag. Test seam `RA_USER_DATA_DIR` added to
   `src/main/index.ts` for isolated e2e profiles.
+- Additional hardening: `src/shared/csp.ts` is the single CSP source used by both the build-time meta
+  tag and a runtime `onHeadersReceived` header; `session.defaultSession` denies all permission
+  requests/checks. `xlsx` is now the vendor-patched 0.20.3 tarball from `cdn.sheetjs.com` (D13).
+- CI added: `.github/workflows/ci.yml` runs typecheck/lint/test/build on push to `main` and PRs.

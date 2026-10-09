@@ -78,21 +78,62 @@ export function clamp01(value: number): number {
   return value;
 }
 
+function quarterTurns(rotation: number): number {
+  return ((Math.round(rotation / 90) * 90) % 360 + 360) % 360;
+}
+
+/**
+ * Map a rect stored in the page's unrotated (0°) frame into the currently displayed frame.
+ * Highlights are persisted against the unrotated page box so they stay aligned at any rotation.
+ */
+export function rectToDisplay(rect: NormalizedRect, rotation: number): NormalizedRect {
+  switch (quarterTurns(rotation)) {
+    case 90:
+      return { x: 1 - rect.y - rect.h, y: rect.x, w: rect.h, h: rect.w };
+    case 180:
+      return { x: 1 - rect.x - rect.w, y: 1 - rect.y - rect.h, w: rect.w, h: rect.h };
+    case 270:
+      return { x: rect.y, y: 1 - rect.x - rect.w, w: rect.h, h: rect.w };
+    default:
+      return { x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+  }
+}
+
+/** Inverse of `rectToDisplay`: a displayed-frame rect back into the unrotated (0°) frame. */
+export function rectFromDisplay(rect: NormalizedRect, rotation: number): NormalizedRect {
+  switch (quarterTurns(rotation)) {
+    case 90:
+      return { x: rect.y, y: 1 - rect.x - rect.w, w: rect.h, h: rect.w };
+    case 180:
+      return { x: 1 - rect.x - rect.w, y: 1 - rect.y - rect.h, w: rect.w, h: rect.h };
+    case 270:
+      return { x: 1 - rect.y - rect.h, y: rect.x, w: rect.h, h: rect.w };
+    default:
+      return { x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+  }
+}
+
+function pageRotation(pageElement: HTMLElement): number {
+  const value = Number(pageElement.dataset.rotation ?? "0");
+  return Number.isFinite(value) ? value : 0;
+}
+
 /** Find the rendered PDF page element inside a viewer container (`data-page` is 1-based). */
 export function pageElementFor(container: ParentNode, page: number): HTMLElement | null {
   return container.querySelector<HTMLElement>(`.ra-pdf-page[data-page="${page}"]`);
 }
 
-/** Map normalized page rects back to viewport client rects (for overlay/drawing). */
+/** Map normalized (unrotated) page rects back to viewport client rects (for overlay/drawing). */
 export function normalizedRectsToClient(pageElement: HTMLElement, rects: NormalizedRect[]): DOMRect[] {
   const pageRect = pageElement.getBoundingClientRect();
-  return rects.map(
-    (rect) =>
-      new DOMRect(
-        pageRect.left + rect.x * pageRect.width,
-        pageRect.top + rect.y * pageRect.height,
-        rect.w * pageRect.width,
-        rect.h * pageRect.height
-      )
-  );
+  const rotation = pageRotation(pageElement);
+  return rects.map((rect) => {
+    const display = rectToDisplay(rect, rotation);
+    return new DOMRect(
+      pageRect.left + display.x * pageRect.width,
+      pageRect.top + display.y * pageRect.height,
+      display.w * pageRect.width,
+      display.h * pageRect.height
+    );
+  });
 }

@@ -10,7 +10,7 @@ import {
 } from "./pdf";
 import "./pdf-viewer.css";
 import type { RendererViewProps } from "./registry";
-import { emitSelection, registerSelectionTarget, type NormalizedRect } from "./selection";
+import { emitSelection, rectFromDisplay, registerSelectionTarget, type NormalizedRect } from "./selection";
 
 interface Size {
   w: number;
@@ -37,6 +37,7 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
   const [viewportSize, setViewportSize] = useState<Size>({ w: 0, h: 0 });
   const [scale, setScale] = useState(1);
   const [fitMode, setFitMode] = useState<FitMode>("width");
+  const [rotation, setRotation] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [jumpText, setJumpText] = useState("1");
   const [loading, setLoading] = useState(true);
@@ -56,6 +57,7 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
     setBaseSize(null);
     setError(null);
     setLoading(true);
+    setRotation(0);
     void (async () => {
       try {
         const bytes = await window.api.file.readBytes(ref.path);
@@ -65,12 +67,8 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
           void task.destroy();
           return;
         }
-        const firstPage = await doc.getPage(1);
-        const viewport = firstPage.getViewport({ scale: 1 });
-        if (!active) return;
         setPdf(doc);
         setNumPages(doc.numPages);
-        setBaseSize({ w: viewport.width, h: viewport.height });
         setCurrentPage(1);
       } catch (loadError) {
         if (active) setError(loadError instanceof Error ? loadError.message : String(loadError));
@@ -84,6 +82,22 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
       if (task) void task.destroy();
     };
   }, [ref.path]);
+
+  useEffect(() => {
+    if (!pdf) return;
+    let active = true;
+    void pdf
+      .getPage(1)
+      .then((page) => {
+        if (!active) return;
+        const viewport = page.getViewport({ scale: 1, rotation });
+        setBaseSize({ w: viewport.width, h: viewport.height });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [pdf, rotation]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -177,6 +191,7 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
     }
     if (!pageElement) return;
     const pageRect = pageElement.getBoundingClientRect();
+    const elementRotation = Number(pageElement.dataset.rotation ?? "0") || 0;
     const rects: NormalizedRect[] = [];
     for (const clientRect of Array.from(range.getClientRects())) {
       const left = Math.max(clientRect.left, pageRect.left);
@@ -184,12 +199,18 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
       const right = Math.min(clientRect.right, pageRect.right);
       const bottom = Math.min(clientRect.bottom, pageRect.bottom);
       if (right <= left || bottom <= top) continue;
-      rects.push({
-        x: (left - pageRect.left) / pageRect.width,
-        y: (top - pageRect.top) / pageRect.height,
-        w: (right - left) / pageRect.width,
-        h: (bottom - top) / pageRect.height
-      });
+      // Store against the unrotated page frame so the highlight stays aligned when rotated later.
+      rects.push(
+        rectFromDisplay(
+          {
+            x: (left - pageRect.left) / pageRect.width,
+            y: (top - pageRect.top) / pageRect.height,
+            w: (right - left) / pageRect.width,
+            h: (bottom - top) / pageRect.height
+          },
+          elementRotation
+        )
+      );
     }
     if (rects.length === 0) {
       emitSelection(null);
@@ -212,6 +233,7 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
           pdf={pdf}
           pageNumber={index + 1}
           scale={scale}
+          rotation={rotation}
           baseSize={baseSize ?? { w: 612, h: 792 }}
           rootRef={rootRef}
           registerPage={registerPage}
@@ -234,6 +256,26 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
         </button>
         <button type="button" onClick={() => setFitMode("page")} className={toolbarButton} disabled={!pdf}>
           Fit page
+        </button>
+        <button
+          type="button"
+          onClick={() => setRotation((current) => (current + 270) % 360)}
+          className={toolbarButton}
+          disabled={!pdf}
+          title="Rotate left"
+          aria-label="Rotate left"
+        >
+          ⟲
+        </button>
+        <button
+          type="button"
+          onClick={() => setRotation((current) => (current + 90) % 360)}
+          className={toolbarButton}
+          disabled={!pdf}
+          title="Rotate right"
+          aria-label="Rotate right"
+        >
+          ⟳
         </button>
         <span className="mx-1 h-4 w-px bg-border" />
         <button
@@ -298,18 +340,19 @@ interface PdfPageProps {
   pdf: PDFDocumentProxy;
   pageNumber: number;
   scale: number;
+  rotation: number;
   baseSize: Size;
   rootRef: RefObject<HTMLDivElement | null>;
   registerPage: (pageNumber: number, element: HTMLDivElement | null) => void;
 }
 
-function PdfPage({ pdf, pageNumber, scale, baseSize, rootRef, registerPage }: PdfPageProps) {
+function PdfPage({ pdf, pageNumber, scale, rotation, baseSize, rootRef, registerPage }: PdfPageProps) {
   const pageRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textRef = useRef<HTMLDivElement | null>(null);
   const renderedKeyRef = useRef("");
   const [active, setActive] = useState(false);
-  const [measured, setMeasured] = useState<{ scale: number; w: number; h: number } | null>(null);
+  const [measured, setMeasured] = useState<{ scale: number; rotation: number; w: number; h: number } | null>(null);
 
   useEffect(() => {
     const element = pageRef.current;
@@ -336,11 +379,12 @@ function PdfPage({ pdf, pageNumber, scale, baseSize, rootRef, registerPage }: Pd
     element.style.setProperty("--user-unit", "1");
     element.style.setProperty("--scale-round-x", "1px");
     element.style.setProperty("--scale-round-y", "1px");
-  }, [scale]);
+    element.dataset.rotation = String(rotation);
+  }, [scale, rotation]);
 
   useEffect(() => {
     if (!active) return;
-    const renderKey = `${pageNumber}:${scale}:${window.devicePixelRatio}`;
+    const renderKey = `${pageNumber}:${scale}:${rotation}:${window.devicePixelRatio}`;
     if (renderedKeyRef.current === renderKey) return;
     let cancelled = false;
     let renderTask: RenderTask | null = null;
@@ -348,8 +392,8 @@ function PdfPage({ pdf, pageNumber, scale, baseSize, rootRef, registerPage }: Pd
     void (async () => {
       const page = await pdf.getPage(pageNumber);
       if (cancelled) return;
-      const viewport = page.getViewport({ scale });
-      setMeasured({ scale, w: viewport.width, h: viewport.height });
+      const viewport = page.getViewport({ scale, rotation });
+      setMeasured({ scale, rotation, w: viewport.width, h: viewport.height });
       const canvas = canvasRef.current;
       if (!canvas) return;
       const outputScale = window.devicePixelRatio || 1;
@@ -386,9 +430,12 @@ function PdfPage({ pdf, pageNumber, scale, baseSize, rootRef, registerPage }: Pd
       renderTask?.cancel();
       textLayer?.cancel();
     };
-  }, [active, pdf, pageNumber, scale]);
+  }, [active, pdf, pageNumber, scale, rotation]);
 
-  const size = measured && measured.scale === scale ? measured : { w: baseSize.w * scale, h: baseSize.h * scale };
+  const size =
+    measured && measured.scale === scale && measured.rotation === rotation
+      ? measured
+      : { w: baseSize.w * scale, h: baseSize.h * scale };
 
   return (
     <div

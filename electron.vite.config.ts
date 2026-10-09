@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import type { Plugin } from "vite";
+import { buildContentSecurityPolicy } from "./src/shared/csp";
 
 // pdf.js fetches CMaps, standard fonts, and WASM decoders (JBIG2/JPEG2000) at runtime. Vite only
 // bundles the worker, so those directories are copied from the dependency into the renderer's
@@ -41,22 +42,7 @@ function contentSecurityPolicy(): Plugin {
     name: "csp",
     transformIndexHtml(_html, ctx) {
       const dev = Boolean(ctx.server);
-      const scriptSrc = dev ? "'self' 'unsafe-inline'" : "'self'";
-      const connectSrc = dev ? "'self' ws: wss:" : "'self'";
-      const content = [
-        "default-src 'self'",
-        `script-src ${scriptSrc}`,
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob:",
-        "font-src 'self' data:",
-        `connect-src ${connectSrc}`,
-        "worker-src 'self' blob:",
-        "child-src 'self' blob:",
-        "frame-src 'none'",
-        "object-src 'none'",
-        "base-uri 'none'",
-        "form-action 'none'"
-      ].join("; ");
+      const content = buildContentSecurityPolicy(dev);
       return {
         html: _html,
         tags: [

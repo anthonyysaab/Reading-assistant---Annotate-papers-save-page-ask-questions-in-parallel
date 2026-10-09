@@ -6,6 +6,7 @@ import {
   normalizedRectsToClient,
   onSelection,
   pageElementFor,
+  rectToDisplay,
   type DocSelection
 } from "@renderer/viewer/selection";
 import { DEFAULT_COLOR } from "./colors";
@@ -19,9 +20,10 @@ interface Position {
 
 const LAYER_CLASS = "ra-annotation-layer";
 
-function buildHighlights(annotation: Annotation, active: boolean): HTMLElement[] {
+function buildHighlights(annotation: Annotation, active: boolean, rotation: number): HTMLElement[] {
   const color = annotation.color ?? DEFAULT_COLOR;
-  return annotation.anchor.rects.map((rect) => {
+  return annotation.anchor.rects.map((stored) => {
+    const rect = rectToDisplay(stored, rotation);
     const element = document.createElement("button");
     element.type = "button";
     element.dataset.annotationId = annotation.id;
@@ -96,6 +98,7 @@ export function HighlightLayer() {
     const active = activeIdRef.current;
     root.querySelectorAll<HTMLElement>(".ra-pdf-page[data-page]").forEach((page) => {
       const pageNumber = Number(page.dataset.page);
+      const rotation = Number(page.dataset.rotation ?? "0") || 0;
       const mine = items.filter(
         (item) => item.anchor.page === pageNumber && item.anchor.rects.length > 0
       );
@@ -110,17 +113,17 @@ export function HighlightLayer() {
         layer.addEventListener("click", onHighlightClick);
         page.appendChild(layer);
       }
-      const signature = mine
+      const signature = `${rotation}|${mine
         .map(
           (item) =>
             `${item.id}:${item.color ?? ""}:${item.note ? "1" : "0"}:${item.stale ? "1" : "0"}:${
               item.id === active ? "1" : "0"
             }`
         )
-        .join("|");
+        .join("|")}`;
       if (layer.dataset.signature === signature) return;
       layer.dataset.signature = signature;
-      layer.replaceChildren(...mine.flatMap((item) => buildHighlights(item, item.id === active)));
+      layer.replaceChildren(...mine.flatMap((item) => buildHighlights(item, item.id === active, rotation)));
     });
   }, [onHighlightClick]);
 
@@ -180,7 +183,12 @@ export function HighlightLayer() {
       });
     };
     const observer = new MutationObserver(schedule);
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-rotation"]
+    });
     return () => {
       observer.disconnect();
       if (frame) cancelAnimationFrame(frame);

@@ -90,14 +90,15 @@ target Windows; avoid macOS/Linux-only assumptions.
 **Why:** Development and use happen here.
 **Consequence:** `electron-builder` produces an NSIS installer (M5).
 
-## D13 — Dependency security: accept `xlsx` advisory, pin `sprintf-js`
-**Decision:** Keep SheetJS `xlsx` at 0.18.5 (no patched release is published to npm) and accept its
-two advisories (prototype pollution, ReDoS). Pin the transitive `sprintf-js` to `^1.1.3` via npm
-`overrides` to clear the `mammoth → argparse → sprintf-js` advisory.
-**Why:** The spreadsheet extractor only parses files the user opens locally; there is no untrusted
-remote or network input, and the renderer is sandboxed. The `xlsx` surface is confined to
-`src/main/ingest/xlsx.ts` (`XLSX.read` + `sheet_to_json`), so swapping it for a maintained
-pure-JS reader later is a one-module change behind the ingest seam.
-**Consequence:** `npm audit --omit=dev` reports a single high (xlsx). Revisit if a maintained,
-patched pure-JS xlsx reader is adopted.
+## D13 — Dependency security: patched xlsx + pinned sprintf-js
+**Decision:** Install SheetJS from the maintainer's registry
+(`xlsx@https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`) to pick up the prototype-pollution and
+ReDoS fixes that the npm-registry copy (0.18.5) never received, and pin the transitive `sprintf-js`
+to `^1.1.3` via npm `overrides`.
+**Why:** Both are pure-JS, API-compatible, and confined to the `src/main/ingest` seam (SheetJS) and a
+mammoth transitive (sprintf-js). 0.20.3 is the same vendor and API, so the extractor is unchanged.
+**Consequence:** `npm audit --omit=dev` no longer reports the xlsx advisory. It still reports a
+moderate for `mammoth → argparse → sprintf-js` because npm audits argparse's declared range
+(`~1.0.2`); the override actually installs the patched **1.1.3** (verified — no vulnerable copy on
+disk). Ignore that false positive.
 **Date:** 2026-10-09

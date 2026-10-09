@@ -143,5 +143,8 @@ correctly.
   `pdfjs-dist/{cmaps,standard_fonts,wasm}` into `src/renderer/public/pdfjs/` (gitignored; emitted to
   `out/renderer/pdfjs/`), `viewer/pdf.ts` exports `PDF_ASSET_URLS` (resolved against
   `document.baseURI`), and `pdf-viewer.tsx` passes `cMapUrl`/`standardFontDataUrl`/`wasmUrl` to
-  `getDocument`. Closes the CJK/JBIG2/JPEG2000 rendering gap. Rotate is still not implemented
-  (normalized-rect overlays remain rotation-safe by design).
+  `getDocument`. Closes the CJK/JBIG2/JPEG2000 rendering gap.
+- Rotate control added to the PDF toolbar (left/right, quarter turns). Highlights/selection store
+  rects in the page's **unrotated** frame (`rectFromDisplay`) and convert to the displayed frame on
+  render (`rectToDisplay`), so highlights stay aligned across rotation; the overlay rebuild is keyed
+  on the page's `data-rotation`. `selection.test.ts` covers the transform round-trip.
