@@ -5,7 +5,10 @@ import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
 import { Icon } from "@renderer/components/Icon";
 import { formatBytes } from "@renderer/lib/format";
 import { useAppStore } from "@renderer/state/appStore";
+import { NO_BOOKMARKS, useBookmarkStore } from "@renderer/state/bookmarkStore";
 import { useSettingsStore } from "@renderer/state/settingsStore";
+import { useViewStateStore } from "@renderer/state/viewStateStore";
+import { BOOKMARK_JUMP_EVENT, type BookmarkJumpDetail } from "./bookmarkJump";
 import { languageForExt } from "./languages";
 import type { RendererViewProps } from "./registry";
 import { clearSelectionForDoc, emitSelection } from "./selection";
@@ -29,6 +32,10 @@ export function TextViewer({ ref, docId }: RendererViewProps) {
   const setDocDirty = useAppStore((state) => state.setDocDirty);
   const setSelection = useAppStore((state) => state.setSelection);
   const themePref = useSettingsStore((state) => state.settings?.ui.theme ?? "dark");
+  const bookmarks = useBookmarkStore((state) => state.byDoc[ref.path] ?? NO_BOOKMARKS);
+  const loadBookmarks = useBookmarkStore((state) => state.load);
+  const addBookmark = useBookmarkStore((state) => state.add);
+  const setPosition = useViewStateStore((state) => state.setPosition);
 
   const markDirty = useCallback(
     (next: boolean) => {
@@ -63,6 +70,61 @@ export function TextViewer({ ref, docId }: RendererViewProps) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void loadBookmarks(ref.path);
+  }, [ref.path, loadBookmarks]);
+
+  useEffect(() => {
+    if (status !== "ready" || value === null) return;
+    let cleanupScroll: (() => void) | null = null;
+    const raf = requestAnimationFrame(() => {
+      const view = editorRef.current?.view;
+      if (!view) return;
+      const el = view.scrollDOM;
+      const saved = useViewStateStore.getState().positions[ref.path]?.position;
+      const max = el.scrollHeight - el.clientHeight;
+      if (typeof saved === "number" && saved > 0 && max > 0) {
+        view.requestMeasure({ read: () => undefined, write: () => { el.scrollTop = saved * max; } });
+      }
+      let frame = 0;
+      const onScroll = (): void => {
+        if (frame) return;
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          const limit = el.scrollHeight - el.clientHeight;
+          setPosition(ref.path, { position: limit > 0 ? el.scrollTop / limit : 0 });
+        });
+      };
+      el.addEventListener("scroll", onScroll, { passive: true });
+      cleanupScroll = () => {
+        el.removeEventListener("scroll", onScroll);
+        if (frame) cancelAnimationFrame(frame);
+      };
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      cleanupScroll?.();
+    };
+  }, [status, value, ref.path, setPosition]);
+
+  useEffect(() => {
+    const handler = (event: Event): void => {
+      const detail = (event as CustomEvent<BookmarkJumpDetail>).detail;
+      if (!detail || detail.docId !== docId) return;
+      const view = editorRef.current?.view;
+      if (!view) return;
+      const el = view.scrollDOM;
+      view.requestMeasure({
+        read: () => undefined,
+        write: () => {
+          el.scrollTop = detail.position * (el.scrollHeight - el.clientHeight);
+        }
+      });
+    };
+    window.addEventListener(BOOKMARK_JUMP_EVENT, handler);
+    return () => window.removeEventListener(BOOKMARK_JUMP_EVENT, handler);
+  }, [docId]);
 
   useEffect(() => () => clearSelectionForDoc(docId), [docId]);
 
@@ -130,6 +192,18 @@ export function TextViewer({ ref, docId }: RendererViewProps) {
     [docId, ref.path, setSelection]
   );
 
+  const addBookmarkHere = useCallback(() => {
+    const view = editorRef.current?.view;
+    if (!view) return;
+    const el = view.scrollDOM;
+    const max = el.scrollHeight - el.clientHeight;
+    const ratio = max > 0 ? el.scrollTop / max : 0;
+    const rect = el.getBoundingClientRect();
+    const pos = view.posAtCoords({ x: rect.left + 8, y: rect.top + 8 });
+    const line = pos !== null ? view.state.doc.lineAt(pos).number : 1;
+    void addBookmark({ docPath: ref.path, position: ratio, label: `Line ${line}` });
+  }, [addBookmark, ref.path]);
+
   if (status === "too-large") {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-bg px-8 text-center">
@@ -176,6 +250,14 @@ export function TextViewer({ ref, docId }: RendererViewProps) {
         {dirty ? <span className="text-accent">• unsaved</span> : null}
         <span className="flex-1" />
         {error ? <span className="text-anno-pink">{error}</span> : null}
+        <button
+          type="button"
+          onClick={addBookmarkHere}
+          className="rounded border border-border px-2 py-0.5 hover:bg-panel hover:text-text"
+          title="Bookmark the current position"
+        >
+          ★ Bookmark{bookmarks.length > 0 ? ` (${bookmarks.length})` : ""}
+        </button>
         <button
           type="button"
           onClick={() => void save()}

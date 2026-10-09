@@ -163,7 +163,7 @@ export interface StoredProvider {
   catalogId?: string;
 }
 
-export type PanelTab = "chat" | "annotations" | "context" | "search";
+export type PanelTab = "chat" | "annotations" | "context" | "search" | "bookmarks";
 
 export interface Settings {
   activeProviderId: string;
@@ -300,6 +300,43 @@ export interface ThreadsApi {
   exportMarkdown(thread: Thread): Promise<string | null>;
 }
 
+/** A saved page (PDF) or scroll position (text) the user can jump back to. */
+export interface Bookmark {
+  id: string;
+  docPath: string;
+  /** 1-based PDF page. Absent for text documents. */
+  page?: number;
+  /** Text scroll ratio 0..1. Absent for PDF documents. */
+  position?: number;
+  label: string;
+  createdAt: string;
+}
+
+export interface SessionPosition {
+  page?: number;
+  position?: number;
+}
+
+/** The set of open documents and per-document reading positions restored on startup. */
+export interface WorkspaceSession {
+  docs: string[];
+  activeDocPath: string | null;
+  positions: Record<string, SessionPosition>;
+}
+
+/** Per-document bookmarks and the last-session snapshot. Added by the workspace feature. */
+export interface WorkspaceApi {
+  bookmarks: {
+    list(docPath: string): Promise<Bookmark[]>;
+    add(input: { docPath: string; page?: number; position?: number; label: string }): Promise<Bookmark>;
+    remove(id: string): Promise<void>;
+  };
+  session: {
+    get(): Promise<WorkspaceSession | null>;
+    set(session: WorkspaceSession): Promise<void>;
+  };
+}
+
 export interface Api {
   file: FileApi;
   doc: DocApi;
@@ -314,6 +351,7 @@ export interface Api {
   onboarding: OnboardingApi;
   update: UpdateApi;
   browser: BrowserApi;
+  workspace: WorkspaceApi;
 }
 
 export interface OpenDoc {

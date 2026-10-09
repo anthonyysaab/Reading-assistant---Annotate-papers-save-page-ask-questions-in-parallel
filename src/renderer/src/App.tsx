@@ -13,6 +13,7 @@ import { AppShell } from "@renderer/layout/AppShell";
 import { OnboardingModal } from "@renderer/onboarding/OnboardingModal";
 import { CommandPalette } from "@renderer/palette/CommandPalette";
 import { registerDefaultSidePanelTabs } from "@renderer/panes/registerDefaults";
+import { useSession } from "@renderer/session/session";
 import { SettingsModal } from "@renderer/settings/SettingsModal";
 import { useSettingsStore } from "@renderer/state/settingsStore";
 import { ThemeProvider } from "@renderer/theme/ThemeProvider";
@@ -47,6 +48,7 @@ export function App() {
   useDragDrop();
   useKeybinds();
   useDefaultModel();
+  useSession(Boolean(settings));
 
   if (!settings) {
     return (

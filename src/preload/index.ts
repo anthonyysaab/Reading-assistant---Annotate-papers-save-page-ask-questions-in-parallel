@@ -9,6 +9,7 @@ import { fromIpcError, type IpcResult } from "@shared/errors";
 import type {
   Annotation,
   Api,
+  Bookmark,
   BrowserApi,
   BrowserBounds,
   BrowserState,
@@ -29,7 +30,8 @@ import type {
   SettingsApi,
   Thread,
   UpdateApi,
-  UpdateInfo
+  UpdateInfo,
+  WorkspaceSession
 } from "@shared/types";
 
 interface FileChangedEvent {
@@ -174,6 +176,18 @@ const browserApi: BrowserApi = {
   onState: (cb) => subscribe<BrowserState>(IPC.browser.state, cb)
 };
 
+const workspaceApi: Api["workspace"] = {
+  bookmarks: {
+    list: (docPath) => invoke<Bookmark[]>(IPC.workspace.bookmarksList, docPath),
+    add: (input) => invoke<Bookmark>(IPC.workspace.bookmarksAdd, input),
+    remove: (id) => invoke<void>(IPC.workspace.bookmarksRemove, id)
+  },
+  session: {
+    get: () => invoke<WorkspaceSession | null>(IPC.workspace.sessionGet),
+    set: (session) => invoke<void>(IPC.workspace.sessionSet, session)
+  }
+};
+
 const api: Api = {
   file: fileApi,
   doc: docApi,
@@ -187,7 +201,8 @@ const api: Api = {
   health: healthApi,
   onboarding: onboardingApi,
   update: updateApi,
-  browser: browserApi
+  browser: browserApi,
+  workspace: workspaceApi
 };
 
 contextBridge.exposeInMainWorld("api", api);

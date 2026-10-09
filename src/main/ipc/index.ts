@@ -11,6 +11,7 @@ import { registerSettingsIpc } from "./settings";
 import { registerStubIpc } from "./stubs";
 import { registerThreadsIpc } from "./threads";
 import { registerUpdateIpc } from "./update";
+import { registerWorkspaceIpc } from "./workspace";
 
 export function registerIpcHandlers(): void {
   registerFileIpc();
@@ -25,5 +26,6 @@ export function registerIpcHandlers(): void {
   registerOnboardingIpc();
   registerUpdateIpc();
   registerBrowserIpc();
+  registerWorkspaceIpc();
   registerStubIpc();
 }

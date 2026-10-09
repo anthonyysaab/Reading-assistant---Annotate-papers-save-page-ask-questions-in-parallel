@@ -77,5 +77,12 @@ export const IPC = {
     setVisible: "browser:setVisible",
     current: "browser:current",
     state: "browser:state"
+  },
+  workspace: {
+    bookmarksList: "workspace:bookmarks:list",
+    bookmarksAdd: "workspace:bookmarks:add",
+    bookmarksRemove: "workspace:bookmarks:remove",
+    sessionGet: "workspace:session:get",
+    sessionSet: "workspace:session:set"
   }
 } as const;

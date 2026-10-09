@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { useAppStore } from "@renderer/state/appStore";
+import { NO_BOOKMARKS, useBookmarkStore } from "@renderer/state/bookmarkStore";
+import { useViewStateStore } from "@renderer/state/viewStateStore";
 import {
   getDocument,
   PDF_ASSET_URLS,
@@ -30,6 +32,7 @@ function clampScale(value: number): number {
 export function PdfViewer({ ref, docId }: RendererViewProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const pagesRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  const pendingRestore = useRef<{ path: string; page: number } | null>(null);
 
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [numPages, setNumPages] = useState(0);
@@ -44,6 +47,15 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
   const [error, setError] = useState<string | null>(null);
 
   const setSelection = useAppStore((state) => state.setSelection);
+  const bookmarks = useBookmarkStore((state) => state.byDoc[ref.path] ?? NO_BOOKMARKS);
+  const loadBookmarks = useBookmarkStore((state) => state.load);
+  const addBookmark = useBookmarkStore((state) => state.add);
+  const removeBookmark = useBookmarkStore((state) => state.remove);
+  const setPosition = useViewStateStore((state) => state.setPosition);
+
+  useEffect(() => {
+    void loadBookmarks(ref.path);
+  }, [ref.path, loadBookmarks]);
 
   const registerPage = useCallback((pageNumber: number, element: HTMLDivElement | null) => {
     if (element) pagesRef.current.set(pageNumber, element);
@@ -58,6 +70,8 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
     setError(null);
     setLoading(true);
     setRotation(0);
+    const saved = useViewStateStore.getState().positions[ref.path]?.page;
+    pendingRestore.current = saved && saved > 1 ? { path: ref.path, page: saved } : null;
     void (async () => {
       try {
         const bytes = await window.api.file.readBytes(ref.path);
@@ -138,6 +152,18 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
   );
 
   useEffect(() => {
+    if (!pdf) return;
+    const pending = pendingRestore.current;
+    if (!pending || pending.path !== ref.path) return;
+    // Let fit/scale settle before measuring page offsets, then land on the saved page.
+    const timer = setTimeout(() => {
+      pendingRestore.current = null;
+      goToPage(pending.page);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [pdf, numPages, goToPage, ref.path]);
+
+  useEffect(() => {
     const root = rootRef.current;
     if (!root || !pdf) return;
     let frame = 0;
@@ -157,6 +183,7 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
         });
         setCurrentPage(best);
         setJumpText(String(best));
+        setPosition(ref.path, { page: best });
       });
     };
     root.addEventListener("scroll", onScroll, { passive: true });
@@ -164,7 +191,7 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
       root.removeEventListener("scroll", onScroll);
       if (frame) cancelAnimationFrame(frame);
     };
-  }, [pdf]);
+  }, [pdf, ref.path, setPosition]);
 
   const onMouseUp = useCallback(() => {
     const selection = window.getSelection();
@@ -226,6 +253,12 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
     setScale((current) => clampScale(current * factor));
   }, []);
 
+  const currentBookmark = bookmarks.find((bookmark) => bookmark.page === currentPage);
+  const toggleBookmark = useCallback(() => {
+    if (currentBookmark) void removeBookmark(currentBookmark);
+    else void addBookmark({ docPath: ref.path, page: currentPage, label: `Page ${currentPage}` });
+  }, [currentBookmark, removeBookmark, addBookmark, ref.path, currentPage]);
+
   const pages = pdf
     ? Array.from({ length: numPages }, (_, index) => (
         <PdfPage
@@ -276,6 +309,17 @@ export function PdfViewer({ ref, docId }: RendererViewProps) {
           aria-label="Rotate right"
         >
           ⟳
+        </button>
+        <span className="mx-1 h-4 w-px bg-border" />
+        <button
+          type="button"
+          onClick={toggleBookmark}
+          className={toolbarButton}
+          disabled={!pdf}
+          title={currentBookmark ? "Remove bookmark for this page" : "Bookmark this page"}
+          aria-pressed={Boolean(currentBookmark)}
+        >
+          <span className={currentBookmark ? "text-accent" : undefined}>★</span> Bookmark
         </button>
         <span className="mx-1 h-4 w-px bg-border" />
         <button

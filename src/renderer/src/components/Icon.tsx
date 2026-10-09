@@ -27,6 +27,7 @@ export type IconName =
   | "forward"
   | "home"
   | "globe"
+  | "bookmark"
   | "chevron-down";
 
 const PATHS: Record<IconName, ReactNode> = {
@@ -130,6 +131,7 @@ const PATHS: Record<IconName, ReactNode> = {
       <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
     </>
   ),
+  bookmark: <path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />,
   "chevron-down": <path d="m6 9 6 6 6-6" />
 };
 
