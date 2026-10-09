@@ -169,3 +169,8 @@ Windows installer runs the full feature set.
   tag and a runtime `onHeadersReceived` header; `session.defaultSession` denies all permission
   requests/checks. `xlsx` is now the vendor-patched 0.20.3 tarball from `cdn.sheetjs.com` (D13).
 - CI added: `.github/workflows/ci.yml` runs typecheck/lint/test/build on push to `main` and PRs.
+- Web search: new **Search** side-panel tab backed by the Brave Search API. Main-process client
+  (`src/main/search/brave.ts`) + `search:query` IPC; key stored via `safeStorage`
+  (`brave-search`, `BRAVE_SEARCH_SECRET_ID`) and set in Settings → Search. Results can be attached
+  to a document's chat and are prepended to the model context as `[web N]`
+  (`src/renderer/src/chat/webContext.ts`, `state/searchStore.ts`, `panes/SearchTab.tsx`). See D14.

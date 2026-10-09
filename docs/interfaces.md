@@ -32,6 +32,7 @@ interface Api {
   events: EventsApi
   health: HealthApi          // added by 05-polish-packaging
   onboarding: OnboardingApi  // added by 05-polish-packaging
+  search: SearchApi          // web search (Brave)
 }
 ```
 
@@ -40,6 +41,10 @@ interface Api {
 > fields (`baseUrl?`, `moduleId?`, `needsSecret?`), and three optional `Settings` fields
 > (`providers?`, `hiddenProviders?`, `onboardingComplete?`). All are JSON-serializable and additive; no
 > existing field changed shape.
+>
+> **Search addition.** `Api.search` powers the Search tab. All network access happens in the main
+> process (the sandboxed renderer keeps `connect-src 'self'`); the Brave API key lives in the
+> `safeStorage` vault under the id `brave-search` and never reaches the renderer.
 
 ### 1.1 `FileApi`
 
@@ -230,7 +235,7 @@ interface ProvidersApi {
 ### 1.7 `SettingsApi` and events
 
 ```ts
-type PanelTab = "chat" | "annotations" | "context"
+type PanelTab = "chat" | "annotations" | "context" | "search"
 
 interface Settings {
   activeProviderId: string
@@ -341,6 +346,29 @@ interface ThreadsApi {
 
 Rename is `save(thread)` with a new `title` (the file is keyed by `docId`); delete is `remove(docId)`.
 `exportMarkdown` opens a native save dialog in main and writes a Markdown rendering of the thread.
+
+### 1.9 `SearchApi`
+
+Web search for the Search side-panel tab, backed by the Brave Search API. Channel: `search:query`.
+
+```ts
+interface WebSearchResult {
+  title: string
+  url: string
+  snippet: string
+  source?: string      // site name, when Brave reports it
+  age?: string         // freshness label, e.g. "2 days ago"
+}
+
+interface SearchApi {
+  query(query: string): Promise<WebSearchResult[]>
+}
+
+const BRAVE_SEARCH_SECRET_ID = "brave-search"  // key stored via SettingsApi.setSecret
+```
+
+The renderer never calls Brave directly: results are fetched in main, and `Attach to chat` prepends
+the results to the model's system context (citable as `[web N]`) for the duration of the chat.
 
 ---
 

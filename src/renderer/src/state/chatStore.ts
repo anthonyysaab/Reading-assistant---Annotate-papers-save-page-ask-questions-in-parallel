@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { ChatMessage, Citation, Thread } from "@shared/types";
 import { buildPromptContext } from "@renderer/chat/context";
+import { buildWebContext } from "@renderer/chat/webContext";
+import { selectAttachedResults, useSearchStore } from "@renderer/state/searchStore";
 import { useSettingsStore } from "@renderer/state/settingsStore";
 
 type ThreadMessage = Thread["messages"][number];
@@ -214,6 +216,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     persistThread(threadId);
 
     const context = await buildPromptContext(docPath, trimmed, selection ?? undefined);
+    const webContext = buildWebContext(selectAttachedResults(useSearchStore.getState(), docId));
     const streamId = newId();
     set((state) => ({
       streams: {
@@ -228,6 +231,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       .map(toChatMessage);
     const messages: ChatMessage[] = [
       ...(context?.promptContext ? [{ role: "system" as const, content: context.promptContext }] : []),
+      ...(webContext ? [{ role: "system" as const, content: webContext }] : []),
       ...history
     ];
 

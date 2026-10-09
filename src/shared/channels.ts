@@ -60,5 +60,8 @@ export const IPC = {
   onboarding: {
     status: "onboarding:status",
     complete: "onboarding:complete"
+  },
+  search: {
+    query: "search:query"
   }
 } as const;

@@ -7,13 +7,15 @@ import { HealthSection } from "./HealthSection";
 import { ModelsSection } from "./ModelsSection";
 import { ProvidersSection } from "./ProvidersSection";
 import { RagSection } from "./RagSection";
+import { SearchSection } from "./SearchSection";
 
-type SettingsTab = "providers" | "models" | "rag" | "appearance" | "health";
+type SettingsTab = "providers" | "models" | "rag" | "search" | "appearance" | "health";
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: "providers", label: "Providers" },
   { id: "models", label: "Models" },
   { id: "rag", label: "RAG" },
+  { id: "search", label: "Search" },
   { id: "appearance", label: "Appearance" },
   { id: "health", label: "Health" }
 ];
@@ -47,6 +49,7 @@ export function SettingsModal() {
           {tab === "providers" ? <ProvidersSection /> : null}
           {tab === "models" ? <ModelsSection /> : null}
           {tab === "rag" ? <RagSection /> : null}
+          {tab === "search" ? <SearchSection /> : null}
           {tab === "appearance" ? <AppearanceSection /> : null}
           {tab === "health" ? <HealthSection /> : null}
         </div>

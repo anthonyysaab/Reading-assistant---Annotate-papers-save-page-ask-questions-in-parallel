@@ -22,9 +22,11 @@ import type {
   ProviderModuleDescriptor,
   RagApi,
   Retrieved,
+  SearchApi,
   Settings,
   SettingsApi,
-  Thread
+  Thread,
+  WebSearchResult
 } from "@shared/types";
 
 interface FileChangedEvent {
@@ -150,6 +152,10 @@ const onboardingApi: Api["onboarding"] = {
   complete: (choices: OnboardingChoices) => invoke<Settings>(IPC.onboarding.complete, choices)
 };
 
+const searchApi: SearchApi = {
+  query: (query) => invoke<WebSearchResult[]>(IPC.search.query, query)
+};
+
 const api: Api = {
   file: fileApi,
   doc: docApi,
@@ -161,7 +167,8 @@ const api: Api = {
   settings: settingsApi,
   events: eventsApi,
   health: healthApi,
-  onboarding: onboardingApi
+  onboarding: onboardingApi,
+  search: searchApi
 };
 
 contextBridge.exposeInMainWorld("api", api);

@@ -102,3 +102,17 @@ moderate for `mammoth → argparse → sprintf-js` because npm audits argparse's
 (`~1.0.2`); the override actually installs the patched **1.1.3** (verified — no vulnerable copy on
 disk). Ignore that false positive.
 **Date:** 2026-10-09
+
+## D14 — Web search: Brave API, main-process only, attach-to-chat
+**Decision:** Add a Search tab backed by the **Brave Search API**. All requests run in the **main
+process**; the API key is stored in the `safeStorage` vault (`brave-search`) and never enters the
+renderer. Results render as plain text; opening a result calls the existing `openExternal`. The user
+can "attach" the current results to a document's chat, which prepends them to the model's system
+context (citable as `[web N]`).
+**Why:** Keeps the sandboxed renderer's strict CSP intact (`connect-src 'self'`, no webviews), avoids
+in-app browsing of untrusted pages, and matches the existing provider/RAG pattern (ground the model,
+cite sources). Brave returns clean JSON suited to this.
+**Consequence:** Web search requires a Brave key and a network connection; it is off until a key is
+set (Settings → Search). Prompts and result snippets are sent to Brave/Brave's index — note the
+privacy trade-off. A different backend would be another `search/*` module.
+**Date:** 2026-10-09
