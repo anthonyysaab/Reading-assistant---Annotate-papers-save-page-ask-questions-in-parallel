@@ -6,7 +6,6 @@ import { registerLlmIpc } from "./llm";
 import { registerOnboardingIpc } from "./onboarding";
 import { registerProvidersIpc } from "./providers";
 import { registerRagIpc } from "./rag";
-import { registerSearchIpc } from "./search";
 import { registerSettingsIpc } from "./settings";
 import { registerStubIpc } from "./stubs";
 import { registerThreadsIpc } from "./threads";
@@ -23,7 +22,6 @@ export function registerIpcHandlers(): void {
   registerRagIpc();
   registerHealthIpc();
   registerOnboardingIpc();
-  registerSearchIpc();
   registerUpdateIpc();
   registerStubIpc();
 }

@@ -22,13 +22,11 @@ import type {
   ProviderModuleDescriptor,
   RagApi,
   Retrieved,
-  SearchApi,
   Settings,
   SettingsApi,
   Thread,
   UpdateApi,
-  UpdateInfo,
-  WebSearchResult
+  UpdateInfo
 } from "@shared/types";
 
 interface FileChangedEvent {
@@ -154,10 +152,6 @@ const onboardingApi: Api["onboarding"] = {
   complete: (choices: OnboardingChoices) => invoke<Settings>(IPC.onboarding.complete, choices)
 };
 
-const searchApi: SearchApi = {
-  query: (query) => invoke<WebSearchResult[]>(IPC.search.query, query)
-};
-
 const updateApi: UpdateApi = {
   check: () => invoke<UpdateInfo>(IPC.update.check),
   install: () => invoke<void>(IPC.update.install)
@@ -175,7 +169,6 @@ const api: Api = {
   events: eventsApi,
   health: healthApi,
   onboarding: onboardingApi,
-  search: searchApi,
   update: updateApi
 };
 

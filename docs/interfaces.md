@@ -32,7 +32,6 @@ interface Api {
   events: EventsApi
   health: HealthApi          // added by 05-polish-packaging
   onboarding: OnboardingApi  // added by 05-polish-packaging
-  search: SearchApi          // web search (Brave)
   update: UpdateApi          // check GitHub Releases for a newer build
 }
 ```
@@ -43,9 +42,9 @@ interface Api {
 > (`providers?`, `hiddenProviders?`, `onboardingComplete?`). All are JSON-serializable and additive; no
 > existing field changed shape.
 >
-> **Search addition.** `Api.search` powers the Search tab. All network access happens in the main
-> process (the sandboxed renderer keeps `connect-src 'self'`); the Brave API key lives in the
-> `safeStorage` vault under the id `brave-search` and never reaches the renderer.
+> **Search.** The Search side-panel tab has no `Api` surface: submitting a query opens
+> `https://duckduckgo.com/?q=…` in the OS default browser through `file.openExternal`, which routes
+> `http(s)` URLs via `shell.openExternal` in the main process (see D14).
 
 ### 1.1 `FileApi`
 
@@ -348,30 +347,7 @@ interface ThreadsApi {
 Rename is `save(thread)` with a new `title` (the file is keyed by `docId`); delete is `remove(docId)`.
 `exportMarkdown` opens a native save dialog in main and writes a Markdown rendering of the thread.
 
-### 1.9 `SearchApi`
-
-Web search for the Search side-panel tab, backed by the Brave Search API. Channel: `search:query`.
-
-```ts
-interface WebSearchResult {
-  title: string
-  url: string
-  snippet: string
-  source?: string      // site name, when Brave reports it
-  age?: string         // freshness label, e.g. "2 days ago"
-}
-
-interface SearchApi {
-  query(query: string): Promise<WebSearchResult[]>
-}
-
-const BRAVE_SEARCH_SECRET_ID = "brave-search"  // key stored via SettingsApi.setSecret
-```
-
-The renderer never calls Brave directly: results are fetched in main, and `Attach to chat` prepends
-the results to the model's system context (citable as `[web N]`) for the duration of the chat.
-
-### 1.10 `UpdateApi`
+### 1.9 `UpdateApi`
 
 Checks the project's GitHub Releases for a build newer than the running version. Channels:
 `update:check`, `update:install`.

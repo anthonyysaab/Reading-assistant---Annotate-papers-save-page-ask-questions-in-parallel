@@ -222,22 +222,6 @@ export interface HealthApi {
   check(): Promise<HealthReport>;
 }
 
-export interface WebSearchResult {
-  title: string;
-  url: string;
-  snippet: string;
-  source?: string;
-  age?: string;
-}
-
-/** Web search over a remote API (Brave). Added for the Search tab. */
-export interface SearchApi {
-  query(query: string): Promise<WebSearchResult[]>;
-}
-
-/** Secret store id under which the Brave Search API key is kept (via `safeStorage`). */
-export const BRAVE_SEARCH_SECRET_ID = "brave-search";
-
 /** Result of checking GitHub Releases for a newer build than the running app. */
 export interface UpdateInfo {
   current: string;
@@ -298,7 +282,6 @@ export interface Api {
   events: EventsApi;
   health: HealthApi;
   onboarding: OnboardingApi;
-  search: SearchApi;
   update: UpdateApi;
 }
 

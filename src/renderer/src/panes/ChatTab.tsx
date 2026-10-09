@@ -5,7 +5,6 @@ import { EmptyState } from "@renderer/components/EmptyState";
 import { Icon } from "@renderer/components/Icon";
 import { selectActiveDoc, useAppStore } from "@renderer/state/appStore";
 import { useChatStore } from "@renderer/state/chatStore";
-import { useSearchStore } from "@renderer/state/searchStore";
 import { toast } from "@renderer/state/toastStore";
 
 const EMPTY: string[] = [];
@@ -23,8 +22,6 @@ export function ChatTab() {
   const threadIds = useChatStore((state) => (docId ? (state.threadIdsByDoc[docId] ?? EMPTY) : EMPTY));
   const threads = useChatStore((state) => state.threads);
   const activeThreadId = useChatStore((state) => (docId ? state.activeThreadByDoc[docId] : undefined));
-  const attachedCount = useSearchStore((state) => (docId ? (state.attachedByDoc[docId]?.length ?? 0) : 0));
-  const detachWeb = useSearchStore((state) => state.detach);
 
   useEffect(() => {
     if (!docId) return;
@@ -107,18 +104,6 @@ export function ChatTab() {
           </button>
         </div>
       </div>
-      {attachedCount > 0 ? (
-        <div className="flex items-center justify-between gap-2 border-b border-border bg-bg-subtle px-3 py-1.5 text-[11px] text-text-weak">
-          <span>{attachedCount} web result(s) attached to this chat.</span>
-          <button
-            type="button"
-            onClick={() => detachWeb(doc.id)}
-            className="rounded border border-border px-1.5 py-0.5 hover:text-text"
-          >
-            Detach
-          </button>
-        </div>
-      ) : null}
       <Transcript docId={doc.id} docPath={doc.ref.path} />
     </div>
   );

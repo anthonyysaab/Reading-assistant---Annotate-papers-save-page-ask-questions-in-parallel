@@ -61,9 +61,6 @@ export const IPC = {
     status: "onboarding:status",
     complete: "onboarding:complete"
   },
-  search: {
-    query: "search:query"
-  },
   update: {
     check: "update:check",
     install: "update:install"

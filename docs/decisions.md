@@ -103,16 +103,15 @@ moderate for `mammoth → argparse → sprintf-js` because npm audits argparse's
 disk). Ignore that false positive.
 **Date:** 2026-10-09
 
-## D14 — Web search: Brave API, main-process only, attach-to-chat
-**Decision:** Add a Search tab backed by the **Brave Search API**. All requests run in the **main
-process**; the API key is stored in the `safeStorage` vault (`brave-search`) and never enters the
-renderer. Results render as plain text; opening a result calls the existing `openExternal`. The user
-can "attach" the current results to a document's chat, which prepends them to the model's system
-context (citable as `[web N]`).
-**Why:** Keeps the sandboxed renderer's strict CSP intact (`connect-src 'self'`, no webviews), avoids
-in-app browsing of untrusted pages, and matches the existing provider/RAG pattern (ground the model,
-cite sources). Brave returns clean JSON suited to this.
-**Consequence:** Web search requires a Brave key and a network connection; it is off until a key is
-set (Settings → Search). Prompts and result snippets are sent to Brave/Brave's index — note the
-privacy trade-off. A different backend would be another `search/*` module.
-**Date:** 2026-10-09
+## D14 — Web search: open in default browser (DuckDuckGo)
+**Decision:** The Search side-panel tab is a thin launcher. Submitting a query opens
+`https://duckduckgo.com/?q=<query>` in the OS default browser via the main-process `file.openExternal`
+handler, which routes `http(s)` URLs through `shell.openExternal`. There is no in-app results UI, no
+`Api.search`, and no API key; the sandboxed renderer keeps `connect-src 'self'` because all browser
+launching happens in main.
+**Why:** Removes the Brave Search API key requirement, the quota limits, and the trade-off of
+proxying queries and snippets through a third-party search API, while keeping the strict CSP intact.
+**Consequence:** Results are viewed in the browser, so the old attach-to-chat grounding (and `[web N]`
+citations) is gone. This supersedes the v0.2.0 Brave-API design: the main-process Brave client, the
+`search:query` IPC channel, the `safeStorage` key, and Settings → Search were all removed.
+**Date:** 2026-10-09 (revised)

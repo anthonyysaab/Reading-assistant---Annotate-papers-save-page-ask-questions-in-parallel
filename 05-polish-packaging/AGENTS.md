@@ -169,12 +169,10 @@ Windows installer runs the full feature set.
   tag and a runtime `onHeadersReceived` header; `session.defaultSession` denies all permission
   requests/checks. `xlsx` is now the vendor-patched 0.20.3 tarball from `cdn.sheetjs.com` (D13).
 - CI added: `.github/workflows/ci.yml` runs typecheck/lint/test/build on push to `main` and PRs.
-- Web search: new **Search** side-panel tab backed by the Brave Search API. Main-process client
-  (`src/main/search/brave.ts`) + `search:query` IPC; key stored via `safeStorage`
-  (`brave-search`, `BRAVE_SEARCH_SECRET_ID`) and set in Settings → Search. Results can be attached
-  to a document's chat and are prepended to the model context as `[web N]`
-  (`src/renderer/src/chat/webContext.ts`, `state/searchStore.ts`, `panes/SearchTab.tsx`). See D14.
+- Web search: the **Search** side-panel tab is a launcher — submitting a query opens
+  `https://duckduckgo.com/?q=…` in the OS default browser through `file.openExternal` (main routes
+  `http(s)` URLs via `shell.openExternal`). No API key, no in-app results. See D14.
 - Update check: `src/main/update/check.ts` queries the repo's latest GitHub release and compares
   versions; the status bar shows an "Update vX" button when one is available (downloads the
   `*-setup.exe` asset to temp and launches it), and the command palette has "Check for updates".
-  IPC `update:check` / `update:install`; `Api.update`. See `docs/interfaces.md` §1.10.
+  IPC `update:check` / `update:install`; `Api.update`. See `docs/interfaces.md` §1.9.

@@ -69,6 +69,10 @@ export async function revealInExplorer(inputPath: string): Promise<void> {
 }
 
 export async function openExternal(inputPath: string): Promise<void> {
+  if (/^https?:\/\//i.test(inputPath)) {
+    await shell.openExternal(inputPath);
+    return;
+  }
   const error = await shell.openPath(resolve(inputPath));
   if (error) throw new Error(error);
 }
