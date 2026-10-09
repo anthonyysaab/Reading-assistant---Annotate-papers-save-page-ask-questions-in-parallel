@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { OnboardingStatus } from "@shared/types";
 import { HighlightLayer } from "@renderer/annotation/HighlightLayer";
+import { ModelPalette } from "@renderer/chat/ModelPalette";
+import { useDefaultModel } from "@renderer/chat/useDefaultModel";
 import { ErrorBoundary } from "@renderer/components/ErrorBoundary";
 import { ToastHost } from "@renderer/components/Toast";
 import { installCitationJumpListener } from "@renderer/context/citationJump";
@@ -44,6 +46,7 @@ export function App() {
   useFileEvents();
   useDragDrop();
   useKeybinds();
+  useDefaultModel();
 
   if (!settings) {
     return (
@@ -67,6 +70,7 @@ export function App() {
       <ErrorBoundary>
         <AppShell />
         <CommandPalette />
+        <ModelPalette />
         <HighlightLayer />
         <SettingsModal />
         {onboarding ? <OnboardingModal status={onboarding} onClose={() => setOnboarding(null)} /> : null}

@@ -3,6 +3,7 @@ import { openSettings, switchPanelTab, togglePalette, togglePanel, toggleSidebar
 import { openViaDialog } from "@renderer/lib/openFiles";
 import { useAppStore } from "@renderer/state/appStore";
 import { useChatStore } from "@renderer/state/chatStore";
+import { useSettingsStore } from "@renderer/state/settingsStore";
 
 export function useKeybinds(): void {
   useEffect(() => {
@@ -46,10 +47,22 @@ export function useKeybinds(): void {
           event.preventDefault();
           void switchPanelTab("context");
           break;
-        case "enter":
+        case "4":
           event.preventDefault();
-          window.dispatchEvent(new CustomEvent("ra:composer-send"));
+          void switchPanelTab("search");
           break;
+        case "enter": {
+          event.preventDefault();
+          const onChat = useSettingsStore.getState().settings?.ui.panelTab === "chat";
+          const fire = () => window.dispatchEvent(new CustomEvent("ra:composer-send"));
+          if (onChat) {
+            fire();
+          } else {
+            // The ask bubble now lives in the Chat tab; focus it before sending.
+            void switchPanelTab("chat").then(() => requestAnimationFrame(fire));
+          }
+          break;
+        }
         case "f":
           event.preventDefault();
           window.dispatchEvent(new CustomEvent("ra:find"));

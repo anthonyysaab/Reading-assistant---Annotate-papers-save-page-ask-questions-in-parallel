@@ -1,4 +1,5 @@
 import { registerAnnotationsIpc } from "./annotations";
+import { registerBrowserIpc } from "./browser";
 import { registerDocIpc } from "./doc";
 import { registerFileIpc } from "./file";
 import { registerHealthIpc } from "./health";
@@ -23,5 +24,6 @@ export function registerIpcHandlers(): void {
   registerHealthIpc();
   registerOnboardingIpc();
   registerUpdateIpc();
+  registerBrowserIpc();
   registerStubIpc();
 }

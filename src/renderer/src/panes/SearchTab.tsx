@@ -1,45 +1,89 @@
-import { useState } from "react";
-import { EmptyState } from "@renderer/components/EmptyState";
+import { useEffect, useState } from "react";
+import { Icon } from "@renderer/components/Icon";
+import { useBrowserBounds } from "./useBrowserBounds";
+import { toUrlOrSearch } from "./webSearch";
 
-const SEARCH_URL = "https://duckduckgo.com/?q=";
+function NavButton({
+  icon,
+  title,
+  disabled,
+  onClick
+}: {
+  icon: "back" | "forward" | "refresh" | "close" | "home";
+  title: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded p-1 text-text-weak hover:text-text disabled:opacity-30 disabled:hover:text-text-weak"
+    >
+      <Icon name={icon} className="h-3.5 w-3.5" />
+    </button>
+  );
+}
 
 export function SearchTab() {
-  const [term, setTerm] = useState("");
-  const trimmed = term.trim();
+  const { placeholderRef, state } = useBrowserBounds();
+  const [address, setAddress] = useState("");
+  const [focused, setFocused] = useState(false);
 
-  const openSearch = (): void => {
-    if (!trimmed) return;
-    void window.api.file.openExternal(`${SEARCH_URL}${encodeURIComponent(trimmed)}`);
+  useEffect(() => {
+    if (!focused) setAddress(state.url);
+  }, [state.url, focused]);
+
+  const navigate = (value: string): void => {
+    const url = toUrlOrSearch(value);
+    if (url) void window.api.browser.navigate(url).catch(() => undefined);
   };
 
   return (
-    <div className="flex h-full flex-col gap-3 overflow-auto p-4">
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          openSearch();
-        }}
-        className="flex items-center gap-2"
-      >
-        <input
-          value={term}
-          onChange={(event) => setTerm(event.target.value)}
-          placeholder="Search the web…"
-          className="min-w-0 flex-1 rounded border border-border bg-bg-subtle px-2 py-1 text-xs text-text outline-none focus:border-accent"
+    <div className="flex h-full flex-col bg-bg">
+      <div className="flex items-center gap-1 border-b border-border bg-bg-subtle px-2 py-1.5">
+        <NavButton icon="back" title="Back" disabled={!state.canGoBack} onClick={() => void window.api.browser.back()} />
+        <NavButton
+          icon="forward"
+          title="Forward"
+          disabled={!state.canGoForward}
+          onClick={() => void window.api.browser.forward()}
         />
-        <button
-          type="submit"
-          disabled={!trimmed}
-          className="rounded border border-border px-2 py-1 text-xs text-text hover:bg-bg-subtle disabled:opacity-40"
+        {state.loading ? (
+          <NavButton icon="close" title="Stop" onClick={() => void window.api.browser.stop()} />
+        ) : (
+          <NavButton icon="refresh" title="Reload" onClick={() => void window.api.browser.reload()} />
+        )}
+        <NavButton icon="home" title="Home" onClick={() => void window.api.browser.home()} />
+        <form
+          className="flex min-w-0 flex-1 items-center"
+          onSubmit={(event) => {
+            event.preventDefault();
+            navigate(address);
+          }}
         >
-          Search
-        </button>
-      </form>
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded border border-border bg-panel px-2 py-1">
+            <Icon name="globe" className="h-3 w-3 shrink-0 text-text-weak" />
+            <input
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder="Search or enter a URL…"
+              spellCheck={false}
+              className="min-w-0 flex-1 bg-transparent text-xs text-text outline-none placeholder:text-text-weak"
+            />
+          </div>
+        </form>
+      </div>
 
-      <EmptyState
-        title="Search the web"
-        hint="Queries open in your default browser via DuckDuckGo."
-      />
+      <div ref={placeholderRef} className="relative min-h-0 flex-1 bg-bg">
+        {state.loading ? (
+          <div className="absolute inset-x-0 top-0 z-10 h-0.5 animate-pulse bg-accent" />
+        ) : null}
+      </div>
     </div>
   );
 }

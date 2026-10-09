@@ -9,6 +9,9 @@ import { fromIpcError, type IpcResult } from "@shared/errors";
 import type {
   Annotation,
   Api,
+  BrowserApi,
+  BrowserBounds,
+  BrowserState,
   ChatRequest,
   DocApi,
   ExtractedDoc,
@@ -157,6 +160,20 @@ const updateApi: UpdateApi = {
   install: () => invoke<void>(IPC.update.install)
 };
 
+const browserApi: BrowserApi = {
+  open: (url) => invoke<BrowserState>(IPC.browser.open, url),
+  navigate: (url) => invoke<void>(IPC.browser.navigate, url),
+  back: () => invoke<void>(IPC.browser.back),
+  forward: () => invoke<void>(IPC.browser.forward),
+  reload: () => invoke<void>(IPC.browser.reload),
+  stop: () => invoke<void>(IPC.browser.stop),
+  home: () => invoke<void>(IPC.browser.home),
+  setBounds: (bounds: BrowserBounds) => invoke<void>(IPC.browser.setBounds, bounds),
+  setVisible: (visible) => invoke<void>(IPC.browser.setVisible, visible),
+  current: () => invoke<BrowserState>(IPC.browser.current),
+  onState: (cb) => subscribe<BrowserState>(IPC.browser.state, cb)
+};
+
 const api: Api = {
   file: fileApi,
   doc: docApi,
@@ -169,7 +186,8 @@ const api: Api = {
   events: eventsApi,
   health: healthApi,
   onboarding: onboardingApi,
-  update: updateApi
+  update: updateApi,
+  browser: browserApi
 };
 
 contextBridge.exposeInMainWorld("api", api);

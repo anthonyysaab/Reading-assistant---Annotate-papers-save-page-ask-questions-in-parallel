@@ -22,7 +22,12 @@ export type IconName =
   | "check"
   | "alert"
   | "key"
-  | "health";
+  | "health"
+  | "back"
+  | "forward"
+  | "home"
+  | "globe"
+  | "chevron-down";
 
 const PATHS: Record<IconName, ReactNode> = {
   file: (
@@ -110,7 +115,22 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M3 12h4l3 8 4-16 3 8h4" />
     </>
-  )
+  ),
+  back: <path d="M19 12H5M12 19l-7-7 7-7" />,
+  forward: <path d="M5 12h14M12 5l7 7-7 7" />,
+  home: (
+    <>
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 10v10h14V10" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" />
+    </>
+  ),
+  "chevron-down": <path d="m6 9 6 6 6-6" />
 };
 
 export function Icon({ name, className }: { name: IconName; className?: string }) {

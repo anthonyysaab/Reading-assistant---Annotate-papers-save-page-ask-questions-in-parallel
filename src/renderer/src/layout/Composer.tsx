@@ -1,56 +1,105 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@renderer/components/Icon";
-import { requestReindex } from "@renderer/lib/commands";
+import { openSettings, requestReindex } from "@renderer/lib/commands";
 import { selectActiveDoc, useAppStore } from "@renderer/state/appStore";
 import { selectIsStreaming, useChatStore } from "@renderer/state/chatStore";
 import { useSettingsStore } from "@renderer/state/settingsStore";
+import { toast } from "@renderer/state/toastStore";
 
-const SLASH_COMMANDS = ["/index", "/reindex", "/clear", "/new", "/export", "/settings"];
+interface SlashCommand {
+  command: string;
+  description: string;
+}
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  { command: "/models", description: "Choose the model" },
+  { command: "/new", description: "New thread" },
+  { command: "/clear", description: "Clear this thread" },
+  { command: "/index", description: "Index this document" },
+  { command: "/reindex", description: "Re-index this document" },
+  { command: "/export", description: "Export thread to Markdown" },
+  { command: "/settings", description: "Open settings" }
+];
 
 export function Composer() {
   const doc = useAppStore(selectActiveDoc);
   const selection = useAppStore((state) => state.selection);
   const setSelection = useAppStore((state) => state.setSelection);
+  const setModelPaletteOpen = useAppStore((state) => state.setModelPaletteOpen);
   const providerId = useSettingsStore((state) => state.settings?.activeProviderId ?? "unset");
   const model = useSettingsStore((state) => state.settings?.activeChatModel ?? "");
   const send = useChatStore((state) => state.send);
   const abort = useChatStore((state) => state.abort);
   const streaming = useChatStore((state) => (doc ? selectIsStreaming(state, doc.id) : false));
   const [text, setText] = useState("");
+  const [menuIndex, setMenuIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const disabled = !doc;
 
-  useEffect(() => {
-    const onSend = () => {
-      const value = textareaRef.current?.value.trim();
-      if (!value || disabled || streaming || !doc) return;
-      setText("");
-      if (value.startsWith("/")) {
-        const command = value.slice(1).trim().split(/\s+/)[0] ?? "";
-        switch (command) {
-          case "clear":
-            useChatStore.getState().clearActiveThread(doc.id);
-            break;
-          case "new":
-            useChatStore.getState().newThread(doc.id);
-            break;
-          case "reindex":
-            void requestReindex();
-            break;
-          case "index":
-            void window.api.rag.index(doc.ref.path).catch(() => undefined);
-            break;
-          default:
-            break;
+  const slashQuery = text.startsWith("/") && !/\s/.test(text) ? text.slice(1).toLowerCase() : null;
+  const matches = useMemo(
+    () => (slashQuery === null ? [] : SLASH_COMMANDS.filter((entry) => entry.command.slice(1).startsWith(slashQuery))),
+    [slashQuery]
+  );
+  const menuOpen = matches.length > 0;
+
+  useEffect(() => setMenuIndex(0), [slashQuery]);
+
+  const runCommand = (command: string): void => {
+    if (!doc) return;
+    setText("");
+    const name = command.replace(/^\//, "");
+    switch (name) {
+      case "models":
+        setModelPaletteOpen(true);
+        break;
+      case "clear":
+        useChatStore.getState().clearActiveThread(doc.id);
+        break;
+      case "new":
+        useChatStore.getState().newThread(doc.id);
+        break;
+      case "reindex":
+        void requestReindex();
+        break;
+      case "index":
+        void window.api.rag.index(doc.ref.path).catch(() => undefined);
+        break;
+      case "export": {
+        const threadId = useChatStore.getState().activeThreadByDoc[doc.id];
+        if (threadId) {
+          void useChatStore.getState().exportThread(doc.id, threadId).then((path) => {
+            if (path) toast.success(`Exported thread to ${path}`);
+          });
         }
-        return;
+        break;
       }
-      void send(doc.id, doc.ref.path, value, selection);
-    };
-    window.addEventListener("ra:composer-send", onSend);
-    return () => window.removeEventListener("ra:composer-send", onSend);
-  }, [disabled, streaming, doc, selection, send]);
+      case "settings":
+        openSettings();
+        break;
+      default:
+        break;
+    }
+  };
+
+  const submit = (): void => {
+    const value = textareaRef.current?.value.trim();
+    if (!value || disabled || streaming || !doc) return;
+    if (value.startsWith("/")) {
+      const command = `/${value.slice(1).trim().split(/\s+/)[0] ?? ""}`;
+      setText("");
+      if (SLASH_COMMANDS.some((entry) => entry.command === command)) runCommand(command);
+      return;
+    }
+    setText("");
+    void send(doc.id, doc.ref.path, value, selection);
+  };
+
+  useEffect(() => {
+    window.addEventListener("ra:composer-send", submit);
+    return () => window.removeEventListener("ra:composer-send", submit);
+  });
 
   return (
     <div className="border-t border-border bg-bg-subtle px-3 py-2">
@@ -66,46 +115,88 @@ export function Composer() {
         </div>
       ) : null}
 
-      <div className="flex items-end gap-2 rounded-md border border-border bg-panel px-2 py-1.5">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          disabled={disabled}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              window.dispatchEvent(new CustomEvent("ra:composer-send"));
-            }
-          }}
-          rows={1}
-          placeholder={disabled ? "Open a document to ask questions" : "Ask about this document…  Enter to send, Shift+Enter for newline"}
-          className="max-h-40 min-h-[28px] flex-1 resize-none bg-transparent text-sm text-text outline-none placeholder:text-text-weak disabled:cursor-not-allowed"
-        />
-        {streaming && doc ? (
-          <button
-            type="button"
-            onClick={() => abort(doc.id)}
-            className="rounded p-1 text-text-weak hover:text-text"
-            title="Stop generating"
-          >
-            <Icon name="close" />
-          </button>
-        ) : (
-          <button
-            type="button"
+      <div className="relative">
+        {menuOpen ? (
+          <ul className="absolute bottom-full left-0 mb-1 w-full overflow-hidden rounded-md border border-border bg-panel py-1 shadow-lg">
+            {matches.map((entry, entryIndex) => (
+              <li key={entry.command}>
+                <button
+                  type="button"
+                  onMouseEnter={() => setMenuIndex(entryIndex)}
+                  onClick={() => runCommand(entry.command)}
+                  className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[12px] ${
+                    entryIndex === menuIndex ? "bg-bg-subtle text-text" : "text-text-weak"
+                  }`}
+                >
+                  <span className="font-mono">{entry.command}</span>
+                  <span className="text-[11px] text-text-weak">{entry.description}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        <div className="flex items-end gap-2 rounded-md border border-border bg-panel px-2 py-1.5">
+          <textarea
+            ref={textareaRef}
+            value={text}
             disabled={disabled}
-            onClick={() => window.dispatchEvent(new CustomEvent("ra:composer-send"))}
-            className="rounded p-1 text-text-weak hover:text-text disabled:opacity-40"
-            title="Send (Ctrl+Enter)"
-          >
-            <Icon name="send" />
-          </button>
-        )}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={(event) => {
+              if (menuOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+                event.preventDefault();
+                setMenuIndex((current) =>
+                  event.key === "ArrowDown"
+                    ? Math.min(current + 1, matches.length - 1)
+                    : Math.max(current - 1, 0)
+                );
+                return;
+              }
+              if (menuOpen && event.key === "Tab") {
+                event.preventDefault();
+                const entry = matches[menuIndex];
+                if (entry) setText(`${entry.command} `);
+                return;
+              }
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                if (menuOpen) {
+                  const entry = matches[menuIndex];
+                  if (entry) runCommand(entry.command);
+                  return;
+                }
+                window.dispatchEvent(new CustomEvent("ra:composer-send"));
+              }
+            }}
+            rows={1}
+            placeholder={disabled ? "Open a document to ask questions" : "Ask about this document…  / for commands, Enter to send"}
+            className="max-h-40 min-h-[28px] flex-1 resize-none bg-transparent text-sm text-text outline-none placeholder:text-text-weak disabled:cursor-not-allowed"
+          />
+          {streaming && doc ? (
+            <button
+              type="button"
+              onClick={() => abort(doc.id)}
+              className="rounded p-1 text-text-weak hover:text-text"
+              title="Stop generating"
+            >
+              <Icon name="close" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={() => window.dispatchEvent(new CustomEvent("ra:composer-send"))}
+              className="rounded p-1 text-text-weak hover:text-text disabled:opacity-40"
+              title="Send (Ctrl+Enter)"
+            >
+              <Icon name="send" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mt-1.5 flex items-center justify-between text-[11px] text-text-weak">
-        <span>{SLASH_COMMANDS.join("  ")}</span>
+        <span>/ for commands · /models to switch model</span>
         <span>
           {streaming ? "generating… · " : ""}
           {providerId}

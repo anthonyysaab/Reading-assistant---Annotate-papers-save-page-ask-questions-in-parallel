@@ -176,3 +176,26 @@ Windows installer runs the full feature set.
   versions; the status bar shows an "Update vX" button when one is available (downloads the
   `*-setup.exe` asset to temp and launches it), and the command palette has "Check for updates".
   IPC `update:check` / `update:install`; `Api.update`. See `docs/interfaces.md` §1.9.
+
+### Update (2026-10-09) — in-app browser + `/models` palette + composer relocation
+- **Search is now an in-app browser (D15, supersedes D14).** `src/main/browser/service.ts` owns a
+  single `WebContentsView` in a dedicated `persist:rabrowser` session (permissions denied, no CSP
+  header), added to the window's `contentView`. `src/main/ipc/browser.ts` + `IPC.browser`
+  (`open|navigate|back|forward|reload|stop|home|setBounds|setVisible|current`, event `browser:state`)
+  and `Api.browser` bridge it. `panes/SearchTab.tsx` is now browser chrome (address/search bar +
+  nav) over a measured placeholder; `panes/useBrowserBounds.ts` keeps the view aligned and hides it
+  whenever the panel is collapsed or a modal/palette is open (a `WebContentsView` composites above
+  the DOM). Host wiring in `src/main/window.ts` (`attachBrowser`/`disposeBrowser`). No renderer CSP
+  change; `frame-src 'none'` retained.
+- **Model selection is a `/models` palette (D16).** `chat/ModelPicker.tsx` removed; new
+  `chat/ModelPalette.tsx` (searchable, keyboard-driven, provider status, quick "add local endpoint"
+  → `StoredProvider` with `kind:"local"`) + `chat/useDefaultModel.ts` (local-first auto-pick moved
+  out of the old dropdown). Opened from the composer slash menu, `Ctrl+P` ("Select model…"), or the
+  Chat-tab header button; `AppStore.modelPaletteOpen` added.
+- **Composer moved into the Chat tab.** Rendered at the bottom of `panes/ChatTab.tsx`; removed from
+  `layout/AppShell.tsx` (both desktop + narrow). `Ctrl+Enter` now switches to the Chat tab before
+  sending; added `Ctrl+4` → Search tab.
+- Docs: `docs/decisions.md` D15/D16, `docs/interfaces.md` §1.10 + Api/Search notes, `docs/layout.md`
+  (diagram, Search tab, Composer, keybinds).
+- Tests: `src/renderer/src/panes/webSearch.test.ts` (5). `npm run typecheck`, `npm run lint`,
+  `npm test` (72 passing) all green.

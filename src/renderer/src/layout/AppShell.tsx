@@ -10,7 +10,6 @@ import {
 import type { Settings } from "@shared/types";
 import { useMediaQuery } from "@renderer/hooks/useMediaQuery";
 import { useSettingsStore } from "@renderer/state/settingsStore";
-import { Composer } from "./Composer";
 import { DocPane } from "./DocPane";
 import { DocTabs } from "./DocTabs";
 import { Sidebar } from "./Sidebar";
@@ -74,7 +73,6 @@ export function AppShell() {
             <div className="min-h-0 flex-1">
               <DocPane />
             </div>
-            <Composer />
           </div>
           {panelOpen ? (
             <>
@@ -112,7 +110,6 @@ export function AppShell() {
               <div className="min-h-0 flex-1">
                 <DocPane />
               </div>
-              <Composer />
             </div>
           </Panel>
           <Separator />

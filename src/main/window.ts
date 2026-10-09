@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell } from "electron";
 import { join } from "node:path";
+import { attachBrowser, disposeBrowser } from "@main/browser/service";
 import { bindEventTarget } from "@main/events";
 
 export function createMainWindow(): BrowserWindow {
@@ -22,6 +23,8 @@ export function createMainWindow(): BrowserWindow {
   });
 
   bindEventTarget(window.webContents);
+  attachBrowser(window);
+  window.on("closed", () => disposeBrowser());
 
   window.once("ready-to-show", () => window.show());
 

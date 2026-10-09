@@ -237,6 +237,36 @@ export interface UpdateApi {
   install(): Promise<void>;
 }
 
+export interface BrowserBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface BrowserState {
+  url: string;
+  title: string;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  loading: boolean;
+}
+
+/** In-app browser embedded in the Search tab via a main-process `WebContentsView`. */
+export interface BrowserApi {
+  open(url?: string): Promise<BrowserState>;
+  navigate(url: string): Promise<void>;
+  back(): Promise<void>;
+  forward(): Promise<void>;
+  reload(): Promise<void>;
+  stop(): Promise<void>;
+  home(): Promise<void>;
+  setBounds(bounds: BrowserBounds): Promise<void>;
+  setVisible(visible: boolean): Promise<void>;
+  current(): Promise<BrowserState>;
+  onState(cb: (state: BrowserState) => void): () => void;
+}
+
 export interface OnboardingChoices {
   providerId?: string;
   model?: string;
@@ -283,6 +313,7 @@ export interface Api {
   health: HealthApi;
   onboarding: OnboardingApi;
   update: UpdateApi;
+  browser: BrowserApi;
 }
 
 export interface OpenDoc {

@@ -14,6 +14,7 @@ interface AppState {
   lastFileEvent: FileEvent | null;
   paletteOpen: boolean;
   settingsOpen: boolean;
+  modelPaletteOpen: boolean;
   selection: string | null;
   openFile: (ref: FileRef) => void;
   closeDoc: (id: string) => void;
@@ -23,6 +24,7 @@ interface AppState {
   setFileEvent: (event: { path: string; type: "change" | "unlink" }) => void;
   setPaletteOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
+  setModelPaletteOpen: (open: boolean) => void;
   setSelection: (text: string | null) => void;
 }
 
@@ -32,6 +34,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastFileEvent: null,
   paletteOpen: false,
   settingsOpen: false,
+  modelPaletteOpen: false,
   selection: null,
 
   openFile: (ref) =>
@@ -88,6 +91,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setPaletteOpen: (open) => set({ paletteOpen: open }),
 
   setSettingsOpen: (open) => set({ settingsOpen: open }),
+
+  setModelPaletteOpen: (open) => set({ modelPaletteOpen: open }),
 
   setSelection: (text) => set({ selection: text })
 }));

@@ -8,22 +8,21 @@ command palette, dark theme). Reuses none of its code.
 ```
 ┌──────────┬───────────────────────────────┬──────────────────────────────┐
 │ Library  │  Document pane (main)         │  Side panel (tabbed)         │
-│ sidebar  │                               │  ┌──────┬──────────┬───────┐  │
-│          │  PDF canvas / editor / image  │  │ Chat │ Annota-  │ Ctx   │  │
-│ recent   │  / fallback                   │  │      │ tions    │       │  │
-│ open     │                               │  │      │          │       │  │
-│          │                               │  │      │          │       │  │
-│          │                               │  └──────┴──────────┴───────┘  │
-│          ├───────────────────────────────┤  (resizable, collapsible)    │
-│          │  Composer                     │                              │
-│          │  [ prompt ................ ]  │                              │
-│          │  selection ref · model · /cmd │                              │
+│ sidebar  │                               │  ┌──────┬────────┬───────┐   │
+│          │  PDF canvas / editor / image  │  │ Chat │ Annota-│ Ctx   │   │
+│ recent   │  / fallback                   │  │      │ tions  │       │   │
+│ open     │                               │  │ ...  │        │       │   │
+│          │                               │  │[ask ]│        │       │   │
+│          │                               │  └──────┴────────┴───────┘   │
+│          │                               │  (resizable, collapsible)    │
+│          │                               │                              │
 └──────────┴───────────────────────────────┴──────────────────────────────┘
 ```
 
 Three resizable regions: **sidebar** (collapsible), **document pane** (flex-grow),
-**side panel** (collapsible, tabbed). A status bar at the very bottom shows index state,
-active provider/model, and token usage.
+**side panel** (collapsible, tabbed). The **Composer** (ask bubble) lives at the **bottom of the
+Chat tab**, not under the document — the document pane keeps its full height. A status bar at the
+very bottom shows index state, active provider/model, and token usage.
 
 ## Library sidebar
 
@@ -48,8 +47,9 @@ Tabs, in order:
    - Transcript of the current thread; streaming assistant messages.
    - Each assistant message may show **citation chips**; clicking one scrolls the document pane
      to that page/chunk and briefly highlights it.
-   - Composer at the bottom (shared with the main pane; see below).
-   - Thread switcher (per-document threads).
+   - **Composer at the bottom of this tab** (the ask bubble; see below).
+   - Thread switcher (per-document threads) and a compact model button that opens the `/models`
+     palette (D16).
 
 2. **Annotations**
    - List of highlights/notes/comments on the current document, grouped by page.
@@ -62,16 +62,26 @@ Tabs, in order:
    - **Token usage** of the current thread and the last retrieval.
    - Buttons: Re-index, Change embedding model.
 
+4. **Search** — in-app browser (D15)
+   - Embedded `WebContentsView` browser with back/forward/reload/home and an address/search bar.
+   - A non-URL query searches DuckDuckGo `?q=…` in-view; results are **not** opened in the OS browser.
+   - The browser view is hidden automatically while a modal/overlay is open or the panel is
+     collapsed (a `WebContentsView` composites above the DOM).
+
 Tabs mirror opencode's `review` + `context` tabs in *behavior* (panels toggle-able, closable
 where sensible), not in code.
 
 ## Composer
 
+Located at the bottom of the **Chat** tab (not the document pane).
+
 - Multi-line prompt input (Enter sends, Shift+Enter newline).
 - **Selection reference**: if the document has an active selection, show a removable chip; when
   present, the question is scoped/boosted to it.
-- Model picker (provider + model) mirroring the active settings, changeable inline.
-- Slash commands (subset for v1): `/index`, `/reindex`, `/clear`, `/new`, `/export`, `/settings`.
+- Typing `/` opens a slash-command autocomplete: `/models`, `/new`, `/clear`, `/index`,
+  `/reindex`, `/export`, `/settings`.
+- `/models` opens the model palette (D16): searchable, keyboard-driven, grouped by provider with
+  local running/offline status, plus a quick "add local endpoint" form.
 - Streams; Stop button while generating.
 
 ## Command palette & keybinds
@@ -82,8 +92,8 @@ where sensible), not in code.
   - `Ctrl+P` command palette
   - `Ctrl+B` toggle sidebar
   - `Ctrl+J` toggle side panel
-  - `Ctrl+1/2/3` Chat / Annotations / Context
-  - `Ctrl+Enter` send message
+  - `Ctrl+1/2/3/4` Chat / Annotations / Context / Search
+  - `Ctrl+Enter` send message (focuses the Chat tab first if needed)
   - `Ctrl+F` find in document
   - `Ctrl+S` save (text files)
   - `Esc` cancel stream / clear selection

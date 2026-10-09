@@ -64,5 +64,18 @@ export const IPC = {
   update: {
     check: "update:check",
     install: "update:install"
+  },
+  browser: {
+    open: "browser:open",
+    navigate: "browser:navigate",
+    back: "browser:back",
+    forward: "browser:forward",
+    reload: "browser:reload",
+    stop: "browser:stop",
+    home: "browser:home",
+    setBounds: "browser:setBounds",
+    setVisible: "browser:setVisible",
+    current: "browser:current",
+    state: "browser:state"
   }
 } as const;

@@ -33,6 +33,7 @@ interface Api {
   health: HealthApi          // added by 05-polish-packaging
   onboarding: OnboardingApi  // added by 05-polish-packaging
   update: UpdateApi          // check GitHub Releases for a newer build
+  browser: BrowserApi        // in-app browser embedded in the Search tab (D15)
 }
 ```
 
@@ -42,9 +43,10 @@ interface Api {
 > (`providers?`, `hiddenProviders?`, `onboardingComplete?`). All are JSON-serializable and additive; no
 > existing field changed shape.
 >
-> **Search.** The Search side-panel tab has no `Api` surface: submitting a query opens
-> `https://duckduckgo.com/?q=…` in the OS default browser through `file.openExternal`, which routes
-> `http(s)` URLs via `shell.openExternal` in the main process (see D14).
+> **Search (D15).** The Search side-panel tab embeds a main-process `WebContentsView` browser,
+> exposed as `Api.browser` (§1.10). Submitting a non-URL entry in the address bar searches
+> DuckDuckGo `?q=…` inside that view; it is no longer routed to the OS browser. The view lives in a
+> dedicated `persist:rabrowser` session and is hidden whenever a modal/overlay is open.
 
 ### 1.1 `FileApi`
 
@@ -369,6 +371,43 @@ interface UpdateApi {
 
 The status bar auto-checks on launch and shows an "Update vX" button when `available`; the command
 palette exposes a manual "Check for updates".
+
+### 1.10 `BrowserApi` (in-app browser, D15)
+
+Backs the Search tab. The main process owns a single `WebContentsView`; the renderer only measures
+its placeholder and drives navigation. Coordinates are device-independent pixels relative to the
+window content area. Channels: `browser:open|navigate|back|forward|reload|stop|home|setBounds|setVisible|current`
+plus the `browser:state` event.
+
+```ts
+interface BrowserBounds { x: number; y: number; width: number; height: number }
+
+interface BrowserState {
+  url: string
+  title: string
+  canGoBack: boolean
+  canGoForward: boolean
+  loading: boolean
+}
+
+interface BrowserApi {
+  open(url?: string): Promise<BrowserState>      // creates the view once; optionally navigates
+  navigate(url: string): Promise<void>
+  back(): Promise<void>
+  forward(): Promise<void>
+  reload(): Promise<void>
+  stop(): Promise<void>
+  home(): Promise<void>
+  setBounds(bounds: BrowserBounds): Promise<void>
+  setVisible(visible: boolean): Promise<void>
+  current(): Promise<BrowserState>
+  onState(cb: (state: BrowserState) => void): () => void   // url/title/loading/nav changes
+}
+```
+
+`emitToRenderer` pushes `browser:state` on navigation, in-page navigation, load start/stop, failure,
+and title change. The view uses a `persist:rabrowser` session with permission requests denied, so
+web content is never subject to the renderer's strict CSP and no renderer CSP relaxation is needed.
 
 ---
 

@@ -115,3 +115,34 @@ proxying queries and snippets through a third-party search API, while keeping th
 citations) is gone. This supersedes the v0.2.0 Brave-API design: the main-process Brave client, the
 `search:query` IPC channel, the `safeStorage` key, and Settings → Search were all removed.
 **Date:** 2026-10-09 (revised)
+**Superseded by D15 (2026-10-09).**
+
+## D15 — Web search: in-app browser in the Search tab (`WebContentsView`)
+**Decision:** The Search side-panel tab embeds a real browser: a main-process `WebContentsView`
+(full chrome — address/search bar, back, forward, reload, home) is positioned over a renderer
+placeholder. The renderer reports the placeholder rect via `browser:setBounds` and visibility via
+`browser:setVisible`; the view is hidden whenever a modal/overlay is open or the panel is
+collapsed. The view runs in its own `persist:rabrowser` session with all permissions denied.
+**Why:** The owner wants results in-app, not routed to the OS browser. `WebContentsView` keeps
+`contextIsolation`/`sandbox` intact and `webviewTag:false`, and avoids the `X-Frame-Options`
+blocks that make an `<iframe>` unusable for search engines. The dedicated session matters: the
+app injects a strict CSP header on `session.defaultSession` (`src/main/index.ts`), which would
+break arbitrary sites; the browser session gets no such header.
+**Consequence:** A `WebContentsView` composites **above** the renderer DOM, so overlays and the
+collapsed panel require explicit hide logic (the one real caveat). One shared view = a single
+browser tab in v1; multi-tab is a later extension. New `Api.browser` (`browser:*` channels);
+`frame-src 'none'` is retained and no renderer CSP changes are needed. This **supersedes D14**
+(which opened `https://duckduckgo.com/?q=…` in the OS browser).
+**Date:** 2026-10-09
+
+## D16 — Model selection: a `/models` palette
+**Decision:** Replace the Chat-tab header dropdown with an opencode-style `/models` command that
+opens a centered, searchable, keyboard-driven model palette. It is also reachable from the command
+palette ("Select model") and a compact header button. The palette groups providers with status
+(`local · running/offline`, `cloud`, `no key`) and includes a quick "add local endpoint" form that
+persists a `StoredProvider` with `kind: "local"`.
+**Why:** Mirrors opencode (`/models`) and gives one place to pick provider+model and add local
+endpoints (Ollama, LM Studio, llama.cpp/vLLM via the OpenAI-compatible module).
+**Consequence:** `chat/ModelPicker.tsx` is removed; `chat/ModelPalette.tsx` and
+`chat/useDefaultModel.ts` replace it, and `AppStore` gains `modelPaletteOpen`. No protocol change.
+**Date:** 2026-10-09

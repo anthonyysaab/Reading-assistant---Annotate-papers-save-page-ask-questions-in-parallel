@@ -1,10 +1,11 @@
 import { useEffect } from "react";
-import { ModelPicker } from "@renderer/chat/ModelPicker";
 import { Transcript } from "@renderer/chat/Transcript";
 import { EmptyState } from "@renderer/components/EmptyState";
 import { Icon } from "@renderer/components/Icon";
+import { Composer } from "@renderer/layout/Composer";
 import { selectActiveDoc, useAppStore } from "@renderer/state/appStore";
 import { useChatStore } from "@renderer/state/chatStore";
+import { useSettingsStore } from "@renderer/state/settingsStore";
 import { toast } from "@renderer/state/toastStore";
 
 const EMPTY: string[] = [];
@@ -22,6 +23,8 @@ export function ChatTab() {
   const threadIds = useChatStore((state) => (docId ? (state.threadIdsByDoc[docId] ?? EMPTY) : EMPTY));
   const threads = useChatStore((state) => state.threads);
   const activeThreadId = useChatStore((state) => (docId ? state.activeThreadByDoc[docId] : undefined));
+  const setModelPaletteOpen = useAppStore((state) => state.setModelPaletteOpen);
+  const activeModel = useSettingsStore((state) => state.settings?.activeChatModel ?? "");
 
   useEffect(() => {
     if (!docId) return;
@@ -93,7 +96,15 @@ export function ChatTab() {
           >
             <Icon name="trash" className="h-3.5 w-3.5" />
           </button>
-          <ModelPicker />
+          <button
+            type="button"
+            onClick={() => setModelPaletteOpen(true)}
+            className="flex max-w-[160px] items-center gap-1 rounded border border-border px-2 py-1 text-[11px] text-text-weak hover:text-text"
+            title="Choose model (/models)"
+          >
+            <Icon name="context" className="h-3 w-3 shrink-0" />
+            <span className="truncate">{activeModel || "Select model"}</span>
+          </button>
           <button
             type="button"
             onClick={() => newThread(doc.id)}
@@ -105,6 +116,7 @@ export function ChatTab() {
         </div>
       </div>
       <Transcript docId={doc.id} docPath={doc.ref.path} />
+      <Composer />
     </div>
   );
 }

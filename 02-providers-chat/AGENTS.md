@@ -73,3 +73,12 @@ Build the provider registry that allows the application to interact with multipl
   - `assert provider configured` happens at send time; the picker shows unconfigured providers greyed as "no key" but does not block selecting them.
 - Interfaces changed: none. Required addition (do not make unasked): a `ThreadsApi` (e.g. `threads:save|load|list|remove`) + `types.ts`/`channels.ts`/preload entry so `Thread` objects persist to `userData/threads/`.
 - Environment notes: Node v24.15.0; no new runtime dependencies (global `fetch` + `AbortController` + hand-rolled SSE/NDJSON parsing). Verified clean: `npm run typecheck:node`, `npm run typecheck:web`, scoped ESLint, `npm test`.
+
+### Update (2026-10-09) — `/models` palette; composer in Chat tab (D16)
+- `chat/ModelPicker.tsx` removed. Replaced by `chat/ModelPalette.tsx` (a `/models` command /
+  command-palette / header-button overlay; provider status + quick add-local-endpoint) and
+  `chat/useDefaultModel.ts` (the old dropdown's local-first auto-select). See `docs/decisions.md` D16.
+- The ask bubble (`layout/Composer.tsx`) now renders at the bottom of `panes/ChatTab.tsx` instead of
+  under the document (`layout/AppShell.tsx`). The composer gained a slash-command autocomplete and
+  wires `/export` and `/settings` (previously no-ops) to the thread export and settings modal.
+- No provider/LLM protocol change; `Api` provider surface unchanged.

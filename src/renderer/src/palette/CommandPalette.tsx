@@ -29,6 +29,7 @@ export function CommandPalette() {
   const commands = useMemo<Command[]>(
     () => [
       { id: "open", label: "Open file…", run: () => void openViaDialog() },
+      { id: "model", label: "Select model… (/models)", run: () => useAppStore.getState().setModelPaletteOpen(true) },
       { id: "sidebar", label: "Toggle sidebar", run: () => void toggleSidebar() },
       { id: "panel", label: "Toggle side panel", run: () => void togglePanel() },
       { id: "chat", label: "Switch to Chat", run: () => void switchPanelTab("chat") },
