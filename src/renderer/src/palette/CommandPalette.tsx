@@ -12,6 +12,7 @@ import {
 import { selectActiveDoc, useAppStore } from "@renderer/state/appStore";
 import { selectActiveThread, useChatStore } from "@renderer/state/chatStore";
 import { toast } from "@renderer/state/toastStore";
+import { useUpdateStore } from "@renderer/state/updateStore";
 
 interface Command {
   id: string;
@@ -33,6 +34,7 @@ export function CommandPalette() {
       { id: "chat", label: "Switch to Chat", run: () => void switchPanelTab("chat") },
       { id: "annotations", label: "Switch to Annotations", run: () => void switchPanelTab("annotations") },
       { id: "context", label: "Switch to Context", run: () => void switchPanelTab("context") },
+      { id: "search", label: "Switch to Search", run: () => void switchPanelTab("search") },
       { id: "theme", label: "Toggle theme", run: () => void cycleTheme() },
       { id: "reindex", label: "Re-index document", run: () => void requestReindex() },
       { id: "settings", label: "Open settings", run: () => openSettings() },
@@ -50,6 +52,29 @@ export function CommandPalette() {
             else toast.success(summary);
           } catch (error) {
             toast.error(error instanceof Error ? error.message : String(error));
+          }
+        }
+      },
+      {
+        id: "update",
+        label: "Check for updates",
+        run: async () => {
+          const store = useUpdateStore.getState();
+          await store.check();
+          const info = useUpdateStore.getState().info;
+          if (info?.available) {
+            if (
+              window.confirm(
+                `Update available: ${info.latest} (you have ${info.current}). Download and install now?`
+              )
+            ) {
+              await useUpdateStore.getState().install();
+              toast.info("Opened the installer — finish the update there.");
+            }
+          } else if (info) {
+            toast.success(`Up to date (v${info.current}).`);
+          } else {
+            toast.error(useUpdateStore.getState().error ?? "Could not check for updates.");
           }
         }
       },

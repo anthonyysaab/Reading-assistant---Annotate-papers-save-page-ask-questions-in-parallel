@@ -63,5 +63,9 @@ export const IPC = {
   },
   search: {
     query: "search:query"
+  },
+  update: {
+    check: "update:check",
+    install: "update:install"
   }
 } as const;

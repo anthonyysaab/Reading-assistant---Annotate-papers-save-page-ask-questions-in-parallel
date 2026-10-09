@@ -10,6 +10,7 @@ import { registerSearchIpc } from "./search";
 import { registerSettingsIpc } from "./settings";
 import { registerStubIpc } from "./stubs";
 import { registerThreadsIpc } from "./threads";
+import { registerUpdateIpc } from "./update";
 
 export function registerIpcHandlers(): void {
   registerFileIpc();
@@ -23,5 +24,6 @@ export function registerIpcHandlers(): void {
   registerHealthIpc();
   registerOnboardingIpc();
   registerSearchIpc();
+  registerUpdateIpc();
   registerStubIpc();
 }

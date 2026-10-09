@@ -174,3 +174,7 @@ Windows installer runs the full feature set.
   (`brave-search`, `BRAVE_SEARCH_SECRET_ID`) and set in Settings → Search. Results can be attached
   to a document's chat and are prepended to the model context as `[web N]`
   (`src/renderer/src/chat/webContext.ts`, `state/searchStore.ts`, `panes/SearchTab.tsx`). See D14.
+- Update check: `src/main/update/check.ts` queries the repo's latest GitHub release and compares
+  versions; the status bar shows an "Update vX" button when one is available (downloads the
+  `*-setup.exe` asset to temp and launches it), and the command palette has "Check for updates".
+  IPC `update:check` / `update:install`; `Api.update`. See `docs/interfaces.md` §1.10.

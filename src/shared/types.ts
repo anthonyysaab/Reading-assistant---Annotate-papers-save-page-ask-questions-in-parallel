@@ -238,6 +238,21 @@ export interface SearchApi {
 /** Secret store id under which the Brave Search API key is kept (via `safeStorage`). */
 export const BRAVE_SEARCH_SECRET_ID = "brave-search";
 
+/** Result of checking GitHub Releases for a newer build than the running app. */
+export interface UpdateInfo {
+  current: string;
+  latest: string | null;
+  available: boolean;
+  releaseUrl: string;
+  installerUrl: string | null;
+}
+
+export interface UpdateApi {
+  check(): Promise<UpdateInfo>;
+  /** Download the latest installer asset and launch it. */
+  install(): Promise<void>;
+}
+
 export interface OnboardingChoices {
   providerId?: string;
   model?: string;
@@ -284,6 +299,7 @@ export interface Api {
   health: HealthApi;
   onboarding: OnboardingApi;
   search: SearchApi;
+  update: UpdateApi;
 }
 
 export interface OpenDoc {

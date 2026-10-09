@@ -26,6 +26,8 @@ import type {
   Settings,
   SettingsApi,
   Thread,
+  UpdateApi,
+  UpdateInfo,
   WebSearchResult
 } from "@shared/types";
 
@@ -156,6 +158,11 @@ const searchApi: SearchApi = {
   query: (query) => invoke<WebSearchResult[]>(IPC.search.query, query)
 };
 
+const updateApi: UpdateApi = {
+  check: () => invoke<UpdateInfo>(IPC.update.check),
+  install: () => invoke<void>(IPC.update.install)
+};
+
 const api: Api = {
   file: fileApi,
   doc: docApi,
@@ -168,7 +175,8 @@ const api: Api = {
   events: eventsApi,
   health: healthApi,
   onboarding: onboardingApi,
-  search: searchApi
+  search: searchApi,
+  update: updateApi
 };
 
 contextBridge.exposeInMainWorld("api", api);

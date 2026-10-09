@@ -33,6 +33,7 @@ interface Api {
   health: HealthApi          // added by 05-polish-packaging
   onboarding: OnboardingApi  // added by 05-polish-packaging
   search: SearchApi          // web search (Brave)
+  update: UpdateApi          // check GitHub Releases for a newer build
 }
 ```
 
@@ -369,6 +370,29 @@ const BRAVE_SEARCH_SECRET_ID = "brave-search"  // key stored via SettingsApi.set
 
 The renderer never calls Brave directly: results are fetched in main, and `Attach to chat` prepends
 the results to the model's system context (citable as `[web N]`) for the duration of the chat.
+
+### 1.10 `UpdateApi`
+
+Checks the project's GitHub Releases for a build newer than the running version. Channels:
+`update:check`, `update:install`.
+
+```ts
+interface UpdateInfo {
+  current: string          // app.getVersion()
+  latest: string | null    // latest release tag without the leading "v", or null if unknown
+  available: boolean
+  releaseUrl: string
+  installerUrl: string | null   // the *-setup.exe asset, when present
+}
+
+interface UpdateApi {
+  check(): Promise<UpdateInfo>   // never throws; "no update" on network failure
+  install(): Promise<void>       // downloads the installer asset to temp and launches it
+}
+```
+
+The status bar auto-checks on launch and shows an "Update vX" button when `available`; the command
+palette exposes a manual "Check for updates".
 
 ---
 

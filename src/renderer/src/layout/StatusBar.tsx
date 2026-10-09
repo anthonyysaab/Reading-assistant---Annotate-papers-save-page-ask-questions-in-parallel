@@ -5,6 +5,8 @@ import { useIndexStatus } from "@renderer/context/useIndexStatus";
 import { openSettings } from "@renderer/lib/commands";
 import { selectActiveDoc, useAppStore } from "@renderer/state/appStore";
 import { useSettingsStore } from "@renderer/state/settingsStore";
+import { toast } from "@renderer/state/toastStore";
+import { useUpdateStore } from "@renderer/state/updateStore";
 
 const HEALTH_DOT: Record<string, string> = {
   ok: "bg-anno-green",
@@ -34,6 +36,14 @@ export function StatusBar() {
   const embeddingProviderId = useSettingsStore((state) => state.settings?.activeEmbeddingProviderId ?? "");
   const { status } = useIndexStatus(doc?.ref.path ?? null);
   const [health, setHealth] = useState<HealthReport | null>(null);
+  const update = useUpdateStore((state) => state.info);
+  const checkUpdate = useUpdateStore((state) => state.check);
+  const installUpdate = useUpdateStore((state) => state.install);
+  const installing = useUpdateStore((state) => state.installing);
+
+  useEffect(() => {
+    void checkUpdate();
+  }, [checkUpdate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +75,22 @@ export function StatusBar() {
         <span>{indexLabel(status?.state)}</span>
       </button>
       <span className="flex shrink-0 items-center gap-1">
+        {update?.available ? (
+          <button
+            type="button"
+            disabled={installing}
+            onClick={() => {
+              if (!window.confirm(`Update Reading Assistant to ${update.latest}? The installer will open.`)) {
+                return;
+              }
+              void installUpdate().then(() => toast.info("Opened the installer — finish the update there."));
+            }}
+            className="rounded border border-accent bg-accent/15 px-1.5 py-0.5 text-accent hover:bg-accent/25 disabled:opacity-40"
+            title={`Update available: ${update.latest}`}
+          >
+            {installing ? "Updating…" : `Update v${update.latest}`}
+          </button>
+        ) : null}
         {health && health.embedding.state !== "ok" ? (
           <span className="text-anno-yellow" title={health.embedding.remediation ?? health.embedding.detail}>
             embeddings: {health.embedding.state}
